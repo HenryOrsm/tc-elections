@@ -76,6 +76,14 @@
       return sb.from('senate_votes').insert({ mc_username: v.name, nation: v.nation, candidate_id: v.candidateId })
         .then(function (r) { if (r.error) throw r.error; });
     },
+    adminVote: function (v) {
+      if (demo) {
+        demoData.votes.push({ mc: 'admin_test_' + Math.random().toString(36).slice(2, 10), nation: v.nation, cand: v.candidateId });
+        return Promise.resolve();
+      }
+      return sb.rpc('admin_cast_senate_vote', { p_nation: v.nation, p_candidate: v.candidateId })
+        .then(function (r) { if (r.error) throw r.error; });
+    },
     signup: function (c) {
       if (demo) return Promise.resolve();
       return sb.from('senate_candidates').insert({ name: c.name, mc_username: c.user, nation: c.nation, party: c.party, pitch: c.pitch || null })
@@ -85,6 +93,12 @@
 
   /* ---------- state + tallies ---------- */
   var state = { candidates: [], results: [], selected: null, me: null, ballotKey: '', voted: null };
+  var isAdmin = false;
+
+  // One senate vote per person: after voting, this browser is locked out. Admins are exempt.
+  var LOCK_KEY = 'voted-senate';
+  function getLock() { try { return localStorage.getItem(LOCK_KEY); } catch (e) { return null; } }
+  function setLock(v) { try { localStorage.setItem(LOCK_KEY, v); } catch (e) { /* private mode: no lock */ } }
 
   function pollsClosed() {
     if (!CFG.pollsCloseAt) return false;
@@ -369,12 +383,21 @@
     }
   }
 
+  function renderGate() {
+    var locked = !!getLock() && !isAdmin;
+    $('id-form').hidden = locked;
+    var box = $('s-locked'); box.hidden = !locked;
+    box.textContent = 'You have already voted in the senate race on this device. It is one vote per person. If something went wrong, ask an admin to change your vote.';
+    $('s-admin').hidden = !isAdmin;
+    $('s-name').closest('.field').hidden = isAdmin;
+  }
+
   function renderBallot() {
     var box = $('ballot');
     if (!state.me) { box.hidden = true; state.ballotKey = ''; return; }
     var n = state.me.nation;
     var cs = state.candidates.filter(function (c) { return c.nation === n; });
-    var key = state.me.name + '|' + n + '|' + cs.map(function (c) { return c.id; }).join(',') + '|' + (state.voted || '') + '|' + pollsClosed();
+    var key = state.me.name + '|' + n + '|' + cs.map(function (c) { return c.id; }).join(',') + '|' + (state.voted || '') + '|' + pollsClosed() + '|' + isAdmin;
     if (key === state.ballotKey) return;           // unchanged: do not wipe the person's pick
     state.ballotKey = key;
     box.hidden = false; clear(box);
@@ -404,8 +427,11 @@
         var pick = document.querySelector('input[name=sen]:checked');
         if (!pick) { vmsg.textContent = 'Pick a candidate.'; vmsg.className = 'msg err'; return; }
         btn.disabled = true; vmsg.textContent = 'Sending...'; vmsg.className = 'msg';
-        api.vote({ name: state.me.name, nation: n, candidateId: pick.value }).then(function () {
-          state.voted = pick.getAttribute('data-name');
+        var req = isAdmin ? api.adminVote({ nation: n, candidateId: pick.value })
+                          : api.vote({ name: state.me.name, nation: n, candidateId: pick.value });
+        req.then(function () {
+          if (isAdmin) { vmsg.textContent = 'Admin test vote counted. Vote as many times as you like.'; vmsg.className = 'msg'; }
+          else { setLock(state.me.name); state.voted = pick.getAttribute('data-name'); renderGate(); }
           return refresh();
         }).catch(function (err) { vmsg.textContent = friendly(err); vmsg.className = 'msg err'; })
           .then(function () { btn.disabled = false; });
@@ -420,8 +446,9 @@
   $('id-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var name = $('s-name').value.trim(), nation = $('s-nation').value;
-    if (!USER_RE.test(name)) return msg('s-msg', 'Enter your Minecraft username (3 to 32 letters, numbers, underscores, dots or spaces).', true);
+    if (!isAdmin && !USER_RE.test(name)) return msg('s-msg', 'Enter your Minecraft username (3 to 32 letters, numbers, underscores, dots or spaces).', true);
     if (!nation) return msg('s-msg', 'Choose your nation.', true);
+    if (!name) name = 'Admin';
     msg('s-msg', '', false);
     state.me = { name: name, nation: nation }; state.voted = null; state.ballotKey = '';
     renderBallot();
@@ -448,7 +475,7 @@
   /* ---------- render + load ---------- */
   function renderAll() {
     var t = tally();
-    renderHero(t); renderControl(t); paintMap(t); renderLegend(); renderPanel(t); renderTable(t); renderForms(); renderBallot();
+    renderHero(t); renderControl(t); paintMap(t); renderLegend(); renderPanel(t); renderTable(t); renderForms(); renderGate(); renderBallot();
   }
 
   var busy = false;
@@ -476,5 +503,8 @@
   buildMap();
   renderAll();
   refresh();
+  // Signed in as an admin on admin.html? Then this page lets you vote unlimited times to test.
+  if (demo) { isAdmin = location.hash === '#admin'; renderAll(); }
+  else EL.checkAdmin(sb).then(function (ok) { isAdmin = ok; renderAll(); });
   setInterval(function () { if (!document.hidden) refresh(); }, Math.max(5, CFG.refreshSeconds || 20) * 1000);
 })();

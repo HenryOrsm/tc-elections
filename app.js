@@ -89,6 +89,14 @@
       return sb.from('votes').insert({ mc_username: v.name, nation: v.nation, candidate_id: v.candidateId })
         .then(function (r) { if (r.error) throw r.error; });
     },
+    adminVote: function (v) {
+      if (demo) {
+        demoData.votes.push({ mc: 'admin_test_' + Math.random().toString(36).slice(2, 10), nation: v.nation, cand: v.candidateId });
+        return Promise.resolve();
+      }
+      return sb.rpc('admin_cast_vote', { p_nation: v.nation, p_candidate: v.candidateId })
+        .then(function (r) { if (r.error) throw r.error; });
+    },
     signup: function (c) {
       if (demo) return Promise.resolve();
       return sb.from('candidates').insert({ name: c.name, mc_username: c.user, party: c.party, home_nation: c.nation, pitch: c.pitch || null })
@@ -97,7 +105,13 @@
   };
 
   /* ---------- state + tallies ---------- */
-  var state = { candidates: [], results: [], selected: null, lastCandKey: '' };
+  var state = { candidates: [], results: [], selected: null, lastCandKey: '', voteNote: '' };
+  var isAdmin = false;
+
+  // One vote per person: after voting, this browser is locked out of the form. Admins are exempt.
+  var LOCK_KEY = 'voted-president';
+  function getLock() { try { return localStorage.getItem(LOCK_KEY); } catch (e) { return null; } }
+  function setLock(v) { try { localStorage.setItem(LOCK_KEY, v); } catch (e) { /* private mode: no lock */ } }
 
   var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' } };
   var PARTY_IDS = Object.keys(PARTIES);
@@ -371,10 +385,21 @@
     });
   }
 
+  function renderGate() {
+    var closed = pollsClosed(), locked = !!getLock();
+    var blocked = !isAdmin && (closed || locked);
+    $('vote-form').hidden = blocked;
+    var box = $('vote-locked'); box.hidden = !blocked;
+    box.textContent = closed ? 'Polls are closed. Thanks for voting.'
+      : (state.voteNote || 'You have already voted in the presidential election on this device. It is one vote per person. If something went wrong, ask an admin to change your vote.');
+    $('admin-note').hidden = !isAdmin;
+    $('v-name').closest('.field').hidden = isAdmin;
+  }
+
   function renderForms() {
     var closed = pollsClosed();
-    $('vote-form').hidden = closed; $('run-form').hidden = closed;
-    $('vote-locked').hidden = !closed; $('run-locked').hidden = !closed;
+    $('run-form').hidden = closed; $('run-locked').hidden = !closed;
+    renderGate();
 
     // nation selects (keep what the person already picked)
     [['v-nation', 'Choose your nation', false], ['r-nation', 'Choose your home nation', true]].forEach(function (cfg) {
@@ -450,12 +475,20 @@
     if ($('v-hp').value) return;
     var name = $('v-name').value.trim(), nation = $('v-nation').value;
     var pick = document.querySelector('input[name=cand]:checked');
-    if (!USER_RE.test(name)) return msg('v-msg', 'Enter your Minecraft username (3 to 32 letters, numbers, underscores, dots or spaces).', true);
+    if (!isAdmin && !USER_RE.test(name)) return msg('v-msg', 'Enter your Minecraft username (3 to 32 letters, numbers, underscores, dots or spaces).', true);
     if (!nation) return msg('v-msg', 'Choose your nation.', true);
     if (!pick) return msg('v-msg', 'Pick a candidate.', true);
     var btn = $('v-submit'); btn.disabled = true; msg('v-msg', 'Sending...', false);
-    api.vote({ name: name, nation: nation, candidateId: pick.value }).then(function () {
-      msg('v-msg', 'Vote counted. Thanks, ' + name + '!', false);
+    var req = isAdmin ? api.adminVote({ nation: nation, candidateId: pick.value })
+                      : api.vote({ name: name, nation: nation, candidateId: pick.value });
+    req.then(function () {
+      if (isAdmin) {
+        msg('v-msg', 'Admin test vote counted. Vote as many times as you like.', false);
+      } else {
+        setLock(name);
+        state.voteNote = 'Vote counted. Thanks, ' + name + '! It is one vote per person, so voting is now locked on this device. If something went wrong, ask an admin to change your vote.';
+        renderGate();
+      }
       $('v-name').value = '';
       return refresh();
     }).catch(function (err) { msg('v-msg', friendly(err), true); })
@@ -486,5 +519,8 @@
   buildMap();
   renderAll();   // draw the map, dropdowns and party picker right away, before any data arrives
   refresh();
+  // Signed in as an admin on admin.html? Then this page lets you vote unlimited times to test.
+  if (demo) { isAdmin = location.hash === '#admin'; renderAll(); }
+  else EL.checkAdmin(sb).then(function (ok) { isAdmin = ok; renderAll(); });
   setInterval(function () { if (!document.hidden) refresh(); }, Math.max(5, CFG.refreshSeconds || 20) * 1000);
 })();

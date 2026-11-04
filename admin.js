@@ -51,6 +51,50 @@
     });
   }
 
+
+  function isTest(x) { return /^admin_test_/i.test(x.mc_username); }
+  function nationIds() { return Object.keys(CFG.nations || {}).filter(function (k) { return k !== 'igt-town'; }); }
+
+  // One vote row with a "Change vote" editor. table is 'votes' or 'senate_votes'.
+  // withNation: president votes can also change the voter's nation. Senate votes keep their nation.
+  function voteRow(table, x, cands, who, withNation) {
+    var wrap = h('div', { 'class': 'item' });
+    var label = isTest(x) ? 'Admin test vote' : x.mc_username;
+    function showNormal() {
+      clear(wrap);
+      wrap.appendChild(h('div', { 'class': 'who' }, h('b', { text: label }),
+        h('span', { text: 'Voted ' + who + ' · ' + nationName(x.nation) + ' · ' + new Date(x.created_at).toLocaleString() })));
+      wrap.appendChild(h('div', { 'class': 'acts' },
+        h('button', { 'class': 'btn small ghost', type: 'button', text: 'Change vote', onclick: showEdit }),
+        h('button', { 'class': 'btn small ghost', type: 'button', text: 'Remove vote', onclick: function () {
+          act(sb.from(table).delete().eq('id', x.id), 'Removed the vote.');
+        } })));
+    }
+    function showEdit() {
+      clear(wrap);
+      var opts = cands.filter(function (c) { return c.approved && (withNation || c.nation === x.nation); });
+      var candSel = h('select', { 'aria-label': 'Candidate' });
+      opts.forEach(function (c) { candSel.appendChild(h('option', { value: c.id, text: c.name + ' (' + party(c).name + ')' })); });
+      candSel.value = x.candidate_id;
+      var natSel = null;
+      if (withNation) {
+        natSel = h('select', { 'aria-label': 'Voter nation' });
+        nationIds().forEach(function (n) { natSel.appendChild(h('option', { value: n, text: nationName(n) })); });
+        natSel.value = x.nation;
+      }
+      wrap.appendChild(h('div', { 'class': 'who' }, h('b', { text: 'Change vote: ' + label }), candSel, natSel));
+      wrap.appendChild(h('div', { 'class': 'acts' },
+        h('button', { 'class': 'btn small', type: 'button', text: 'Save', onclick: function () {
+          var patch = { candidate_id: candSel.value };
+          if (natSel) patch.nation = natSel.value;
+          act(sb.from(table).update(patch).eq('id', x.id), 'Vote changed.');
+        } }),
+        h('button', { 'class': 'btn small ghost', type: 'button', text: 'Cancel', onclick: showNormal })));
+    }
+    showNormal();
+    return wrap;
+  }
+
   function render(cands, votes) {
     var pending = cands.filter(function (c) { return !c.approved; });
     var approved = cands.filter(function (c) { return c.approved; });
@@ -93,13 +137,7 @@
     if (!votes.length) v.appendChild(h('p', { 'class': 'muted', text: 'No votes yet.' }));
     votes.forEach(function (x) {
       var who = byId[x.candidate_id] ? byId[x.candidate_id].name : 'Unknown';
-      v.appendChild(h('div', { 'class': 'item' },
-        h('div', { 'class': 'who' }, h('b', { text: x.mc_username }),
-          h('span', { text: 'Voted ' + who + ' · ' + nationName(x.nation) + ' · ' + new Date(x.created_at).toLocaleString() })),
-        h('div', { 'class': 'acts' },
-          h('button', { 'class': 'btn small ghost', type: 'button', text: 'Remove vote', onclick: function () {
-            act(sb.from('votes').delete().eq('id', x.id), 'Removed the vote from ' + x.mc_username + '.');
-          } }))));
+      v.appendChild(voteRow('votes', x, cands, who, true));
     });
   }
 
@@ -148,13 +186,7 @@
     if (!votes.length) v.appendChild(h('p', { 'class': 'muted', text: 'No senate votes yet.' }));
     votes.forEach(function (x) {
       var who = byId[x.candidate_id] ? byId[x.candidate_id].name : 'Unknown';
-      v.appendChild(h('div', { 'class': 'item' },
-        h('div', { 'class': 'who' }, h('b', { text: x.mc_username }),
-          h('span', { text: 'Voted ' + who + ' · ' + nationName(x.nation) + ' · ' + new Date(x.created_at).toLocaleString() })),
-        h('div', { 'class': 'acts' },
-          h('button', { 'class': 'btn small ghost', type: 'button', text: 'Remove vote', onclick: function () {
-            act(sb.from('senate_votes').delete().eq('id', x.id), 'Removed the senate vote from ' + x.mc_username + '.');
-          } }))));
+      v.appendChild(voteRow('senate_votes', x, cands, who, false));
     });
   }
 
@@ -166,6 +198,12 @@
       say('login-msg', '', false);
       return load();
     });
+  });
+  $('clr-votes').addEventListener('click', function () {
+    if (confirm('Delete every admin test vote in the presidential race?')) act(sb.from('votes').delete().like('mc_username', 'admin_test_%'), 'Cleared the admin test votes.');
+  });
+  $('clr-sen').addEventListener('click', function () {
+    if (confirm('Delete every admin test vote in the senate race?')) act(sb.from('senate_votes').delete().like('mc_username', 'admin_test_%'), 'Cleared the senate admin test votes.');
   });
   $('signout').addEventListener('click', function () { sb.auth.signOut().then(function () { showDash(false); }); });
 

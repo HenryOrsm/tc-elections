@@ -63,5 +63,14 @@
   function pct(x, digits) { return (x * 100).toFixed(digits === undefined ? 1 : digits) + '%'; }
   function num(n) { return Number(n).toLocaleString(); }
 
-  window.EL = { h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
+  // True only if someone is signed in on admin.html (same browser) and is a listed admin.
+  function checkAdmin(sb) {
+    if (!sb) return Promise.resolve(false);
+    return sb.auth.getSession().then(function (r) {
+      if (!r.data || !r.data.session) return false;
+      return sb.rpc('am_i_admin').then(function (x) { return x.data === true; });
+    }).catch(function () { return false; });
+  }
+
+  window.EL = { checkAdmin: checkAdmin, h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
 })();
