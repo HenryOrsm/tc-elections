@@ -144,3 +144,9 @@ footer { padding: 8px 0 48px; color: var(--muted); font-size: 14px; }
 .item .who b { font-size: 16px; }
 .item .who span { display: block; font-size: 14px; color: var(--muted); }
 .item .acts { display: flex; gap: 8px; }
+
+/* logo + party additions */
+.logo-tile { display: grid; place-items: center; background: #fff; padding: 4px 8px; flex: none; }
+.logo-tile img { display: block; height: 40px; width: auto; }
+.sect { font-family: var(--sans); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 18px 0 10px; }
+.panel .sect:first-of-type { margin-top: 4px; }
