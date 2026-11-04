@@ -10,6 +10,7 @@ create table public.candidates (
   mc_username text not null check (mc_username ~ '^[A-Za-z0-9_. ]{3,32}$' and mc_username = btrim(mc_username)),
   home_nation text not null default 'other'
               check (home_nation in ('maradon','goldleaf','dyonisia','seafaria','narellan','cecilia','eldonia','island-a','island-b','other')),
+  party       text not null check (party in ('blue','gold')),
   pitch       text check (char_length(pitch) <= 140),
   color       text check (color ~ '^#[0-9A-Fa-f]{6}$'),
   approved    boolean not null default false,
@@ -32,7 +33,7 @@ create unique index votes_one_per_user on public.votes (lower(mc_username));
 -- Who counts as an admin. Add your own email below, then create that user in
 -- Authentication > Users with a password.
 create table public.admin_emails (email text primary key);
-insert into public.admin_emails (email) values ('narellanfederalcourt1874@gmail.com');
+insert into public.admin_emails (email) values ('CHANGE-ME@example.com');
 
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
