@@ -18,9 +18,9 @@
 
   var demoData = (function () {
     var cands = [
-      { id: 'd1', name: 'Candidate A', home_nation: 'narellan', pitch: 'Sample candidate. Real ones show up once approved.', color: EL.PALETTE[0] },
-      { id: 'd2', name: 'Candidate B', home_nation: 'seafaria', pitch: 'Another sample candidate.', color: EL.PALETTE[1] },
-      { id: 'd3', name: 'Candidate C', home_nation: 'eldonia', pitch: 'A third sample candidate.', color: EL.PALETTE[2] }
+      { id: 'd1', name: 'Candidate A', party: 'blue', home_nation: 'narellan', pitch: 'Sample candidate. Real ones show up once approved.' },
+      { id: 'd2', name: 'Candidate B', party: 'gold', home_nation: 'seafaria', pitch: 'Another sample candidate.' },
+      { id: 'd3', name: 'Candidate C', party: 'blue', home_nation: 'eldonia', pitch: 'A third sample candidate.' }
     ];
     var seed = 7;
     function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
@@ -55,7 +55,7 @@
   var api = {
     candidates: function () {
       if (demo) return Promise.resolve(demoData.cands.slice());
-      return sb.from('candidates').select('id,name,home_nation,pitch,color,created_at')
+      return sb.from('candidates').select('id,name,party,home_nation,pitch,created_at')
         .eq('approved', true).order('created_at', { ascending: true })
         .then(function (r) { if (r.error) throw r.error; return r.data; });
     },
@@ -81,13 +81,22 @@
     },
     signup: function (c) {
       if (demo) return Promise.resolve();
-      return sb.from('candidates').insert({ name: c.name, mc_username: c.user, home_nation: c.nation, pitch: c.pitch || null })
+      return sb.from('candidates').insert({ name: c.name, mc_username: c.user, party: c.party, home_nation: c.nation, pitch: c.pitch || null })
         .then(function (r) { if (r.error) throw r.error; });
     }
   };
 
   /* ---------- state + tallies ---------- */
   var state = { candidates: [], results: [], selected: null, lastCandKey: '' };
+
+  var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' } };
+  var PARTY_IDS = Object.keys(PARTIES);
+  // A candidate is shown in their party's colour.
+  function withParty(c) {
+    var p = PARTIES[c.party] || PARTIES[PARTY_IDS[0]];
+    c.color = p.color; c.partyName = p.name;
+    return c;
+  }
 
   function pollsClosed() {
     if (!CFG.pollsCloseAt) return false;
@@ -237,15 +246,28 @@
   function select(id) { state.selected = state.selected === id ? null : id; renderAll(); }
 
   /* ---------- panels ---------- */
+  function barRow(label, color, v, share) {
+    return h('div', null,
+      h('div', { 'class': 'row-head' },
+        h('span', null, h('span', { 'class': 'sw', style: 'background:' + color }), h('b', { text: label })),
+        h('span', { text: EL.num(v) + ' · ' + EL.pct(share) })),
+      h('div', { 'class': 'bar' }, h('i', { style: 'width:' + (share * 100).toFixed(1) + '%;background:' + color })));
+  }
   function bars(by, total) {
     var wrap = h('div', { 'class': 'rows' });
     sortedCands(by).forEach(function (c) {
-      var v = by[c.id] || 0, share = total ? v / total : 0;
-      wrap.appendChild(h('div', null,
-        h('div', { 'class': 'row-head' },
-          h('span', null, h('span', { 'class': 'sw', style: 'background:' + c.color }), h('b', { text: c.name })),
-          h('span', { text: EL.num(v) + ' · ' + EL.pct(share) })),
-        h('div', { 'class': 'bar' }, h('i', { style: 'width:' + (share * 100).toFixed(1) + '%;background:' + c.color }))));
+      var v = by[c.id] || 0;
+      wrap.appendChild(barRow(c.name + ' (' + c.partyName + ')', c.color, v, total ? v / total : 0));
+    });
+    return wrap;
+  }
+  function partyBars(by, total) {
+    var sums = {};
+    PARTY_IDS.forEach(function (k) { sums[k] = 0; });
+    state.candidates.forEach(function (c) { sums[c.party] = (sums[c.party] || 0) + (by[c.id] || 0); });
+    var wrap = h('div', { 'class': 'rows' });
+    PARTY_IDS.slice().sort(function (a, b) { return sums[b] - sums[a]; }).forEach(function (k) {
+      wrap.appendChild(barRow(PARTIES[k].name, PARTIES[k].color, sums[k], total ? sums[k] / total : 0));
     });
     return wrap;
   }
@@ -261,13 +283,16 @@
       var d = t.byNation[state.selected];
       p.appendChild(h('h2', { text: nationName(state.selected) }));
       p.appendChild(h('p', { 'class': 'sub', text: EL.num(d.total) + (d.total === 1 ? ' vote' : ' votes') + ' from this nation' }));
-      if (d.total) p.appendChild(bars(d.by, d.total));
-      else p.appendChild(h('p', { text: 'Nobody from here has voted yet.' }));
+      if (d.total) {
+        p.appendChild(h('h3', { 'class': 'sect', text: 'By party' })); p.appendChild(partyBars(d.by, d.total));
+        p.appendChild(h('h3', { 'class': 'sect', text: 'By candidate' })); p.appendChild(bars(d.by, d.total));
+      } else p.appendChild(h('p', { text: 'Nobody from here has voted yet.' }));
       p.appendChild(h('button', { 'class': 'btn ghost small', type: 'button', style: 'margin-top:16px', text: 'Back to world total', onclick: function () { select(state.selected); } }));
     } else {
       p.appendChild(h('h2', { text: 'World total' }));
       p.appendChild(h('p', { 'class': 'sub', text: EL.num(t.total) + ' votes in all. Select a nation on the map for its own breakdown.' }));
-      p.appendChild(bars(t.byCand, t.total));
+      p.appendChild(h('h3', { 'class': 'sect', text: 'By party' })); p.appendChild(partyBars(t.byCand, t.total));
+      p.appendChild(h('h3', { 'class': 'sect', text: 'By candidate' })); p.appendChild(bars(t.byCand, t.total));
     }
   }
 
@@ -286,7 +311,7 @@
       box.appendChild(h('article', { 'class': 'cand', style: 'border-top-color:' + c.color },
         h('div', { 'class': 'cand-top' },
           h('div', { 'class': 'avatar', style: 'background:' + c.color + ';color:' + EL.textOn(c.color), 'aria-hidden': 'true', text: c.name.charAt(0).toUpperCase() }),
-          h('div', null, title, h('div', { 'class': 'from', text: 'From ' + nationName(c.home_nation) }))),
+          h('div', null, title, h('div', { 'class': 'from', text: c.partyName + ' · From ' + nationName(c.home_nation) }))),
         c.pitch ? h('p', { 'class': 'pitch', text: c.pitch }) : null,
         h('div', { 'class': 'cand-nums' }, h('b', { text: EL.pct(share) }), h('span', { 'class': 'muted', text: EL.num(v) + ' votes' })),
         h('div', { 'class': 'bar' }, h('i', { style: 'width:' + (share * 100).toFixed(1) + '%;background:' + c.color }))));
@@ -350,6 +375,17 @@
       if (cfg[2]) sel.appendChild(h('option', { value: 'other', text: 'Not from any nation' }));
     });
 
+    // party radios for the sign-up form (built once)
+    var pbox = $('r-parties');
+    if (!pbox.firstChild) {
+      PARTY_IDS.forEach(function (k) {
+        pbox.appendChild(h('label', { 'class': 'choice' },
+          h('input', { type: 'radio', name: 'party', value: k }),
+          h('span', { 'class': 'sw', style: 'background:' + PARTIES[k].color }),
+          h('span', { text: PARTIES[k].name })));
+      });
+    }
+
     // candidate radios (only rebuilt when the ballot changes, so a selection is not lost on refresh)
     var key = state.candidates.map(function (c) { return c.id; }).join(',');
     if (key !== state.lastCandKey) {
@@ -363,7 +399,7 @@
         box.appendChild(h('label', { 'class': 'choice' },
           h('input', { type: 'radio', name: 'cand', value: c.id, checked: prevId === c.id }),
           h('span', { 'class': 'sw', style: 'background:' + c.color }),
-          h('span', null, c.name, h('span', { 'class': 'muted', text: '  (' + nationName(c.home_nation) + ')' }))));
+          h('span', null, c.name, h('span', { 'class': 'muted', text: '  (' + c.partyName + ', ' + nationName(c.home_nation) + ')' }))));
       });
     }
   }
@@ -379,7 +415,7 @@
     if (busy) return Promise.resolve();
     busy = true;
     return Promise.all([api.candidates(), api.results()]).then(function (r) {
-      state.candidates = r[0]; state.results = r[1];
+      state.candidates = r[0].map(withParty); state.results = r[1];
       renderAll();
       $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
     }).catch(function () {
@@ -415,8 +451,10 @@
     if (name.length < 2) return msg('r-msg', 'Enter a candidate name (at least 2 characters).', true);
     if (!USER_RE.test(user)) return msg('r-msg', 'Enter your Minecraft username (3 to 32 letters, numbers, underscores, dots or spaces).', true);
     if (!nation) return msg('r-msg', 'Choose your home nation.', true);
+    var partyPick = document.querySelector('input[name=party]:checked');
+    if (!partyPick) return msg('r-msg', 'Pick a party.', true);
     var btn = $('r-submit'); btn.disabled = true; msg('r-msg', 'Sending...', false);
-    api.signup({ name: name, user: user, nation: nation, pitch: pitch }).then(function () {
+    api.signup({ name: name, user: user, nation: nation, party: partyPick.value, pitch: pitch }).then(function () {
       msg('r-msg', demo ? 'Demo mode: nothing was saved.' : 'Submitted! You will appear on the ballot once an admin approves you.', false);
       $('run-form').reset();
     }).catch(function (err) { msg('r-msg', friendly(err), true); })

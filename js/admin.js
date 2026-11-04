@@ -37,11 +37,8 @@
     });
   }
 
-  function nextColor(approved) {
-    var used = approved.map(function (c) { return c.color; });
-    for (var i = 0; i < EL.PALETTE.length; i++) if (used.indexOf(EL.PALETTE[i]) === -1) return EL.PALETTE[i];
-    return EL.PALETTE[approved.length % EL.PALETTE.length];
-  }
+  var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' } };
+  function party(c) { return PARTIES[c.party] || PARTIES[Object.keys(PARTIES)[0]]; }
 
   function act(promise, okText) {
     return promise.then(function (r) {
@@ -65,11 +62,11 @@
     pending.forEach(function (c) {
       p.appendChild(h('div', { 'class': 'item' },
         h('div', { 'class': 'who' }, h('b', { text: c.name }),
-          h('span', { text: 'Username ' + c.mc_username + ' · from ' + nationName(c.home_nation) }),
+          h('span', { text: party(c).name + ' · username ' + c.mc_username + ' · from ' + nationName(c.home_nation) }),
           c.pitch ? h('span', { text: c.pitch }) : null),
         h('div', { 'class': 'acts' },
           h('button', { 'class': 'btn small', type: 'button', text: 'Approve', onclick: function () {
-            act(sb.from('candidates').update({ approved: true, color: nextColor(approved) }).eq('id', c.id), c.name + ' is on the ballot.');
+            act(sb.from('candidates').update({ approved: true, color: party(c).color }).eq('id', c.id), c.name + ' is on the ballot.');
           } }),
           h('button', { 'class': 'btn small danger', type: 'button', text: 'Reject', onclick: function () {
             if (confirm('Reject and delete ' + c.name + '?')) act(sb.from('candidates').delete().eq('id', c.id), c.name + ' was rejected.');
@@ -81,8 +78,8 @@
     approved.forEach(function (c) {
       a.appendChild(h('div', { 'class': 'item' },
         h('div', { 'class': 'who' },
-          h('b', null, h('span', { 'class': 'sw', style: 'background:' + c.color }), c.name),
-          h('span', { text: 'Username ' + c.mc_username + ' · from ' + nationName(c.home_nation) })),
+          h('b', null, h('span', { 'class': 'sw', style: 'background:' + party(c).color }), c.name),
+          h('span', { text: party(c).name + ' · username ' + c.mc_username + ' · from ' + nationName(c.home_nation) })),
         h('div', { 'class': 'acts' },
           h('button', { 'class': 'btn small danger', type: 'button', text: 'Remove', onclick: function () {
             if (confirm('Remove ' + c.name + ' and all of their votes?')) act(sb.from('candidates').delete().eq('id', c.id), c.name + ' was removed.');
