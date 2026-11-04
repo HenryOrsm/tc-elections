@@ -4,6 +4,11 @@ Live voting site for your Minecraft nations: a popular vote with no electoral co
 
 Until you add your Supabase keys, the site runs in **demo mode** with fake data so you can see how it looks.
 
+## Parties
+There are two parties, **Blue** and **Gold**, coloured from the TC logo. Each candidate picks a party when they sign up. The map and cards use the party colour, and results show totals by party as well as by candidate. Rename them or change the colours in `js/settings.js` (keep the ids `blue` and `gold`).
+
+**Already ran the old `setup.sql`?** Run `supabase/add-parties.sql` once in the SQL Editor to add the party column.
+
 ## Setup (about 15 minutes)
 
 ### 1. Create the database
@@ -21,12 +26,12 @@ Until you add your Supabase keys, the site runs in **demo mode** with fake data 
 3. Your site is live at `https://YOURNAME.github.io/REPONAME/`. Your admin page is `/admin.html` on the same address.
 
 ### 4. Run the election
-- People sign up under **Run for leader**. They stay hidden until you open `/admin.html`, sign in, and press **Approve**. Approving gives them their colour.
+- People sign up under **Run for leader**. They stay hidden until you open `/admin.html`, sign in, and press **Approve**. Their colour comes from their party.
 - In the admin page you can also remove a candidate, or remove a single vote (for example a fake one, or to let someone vote again).
 
 ## Settings in `js/config.js`
 - `pollsCloseAt`: lock voting and sign-ups at a set time, for example `"2026-12-01T20:00:00+10:00"`. This is enforced in the browser only. To close polls properly, run this in the SQL editor: `drop policy "anyone can vote for an approved candidate" on public.votes;`
-- `nations`: rename **Island A** and **Island B** once you know their real names. Change only the names, not the ids.
+- Nation names (including Athens and Grassisland) and parties live in `js/settings.js`. Change only the names, not the ids.
 - `refreshSeconds`: how often results update by themselves.
 
 ## Things you should know
@@ -39,5 +44,7 @@ Until you add your Supabase keys, the site runs in **demo mode** with fake data 
 - `index.html`, `css/style.css`, `js/app.js`: the public site
 - `admin.html`, `js/admin.js`: approvals and vote moderation
 - `js/map-data.js`: the traced map shapes
-- `js/config.js`: your settings
+- `img/`: the TC logo and favicon
+- `js/config.js`: your keys and election settings
+- `js/settings.js`: nation names and parties
 - `supabase/setup.sql`: the database and its security rules
