@@ -29,15 +29,18 @@
       showDash(true);
       return Promise.all([
         sb.from('candidates').select('*').order('created_at', { ascending: true }),
-        sb.from('votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500)
+        sb.from('votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500),
+        sb.from('senate_candidates').select('*').order('created_at', { ascending: true }),
+        sb.from('senate_votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500)
       ]).then(function (res) {
         if (res[0].error || res[1].error) { say('dash-msg', 'Could not load data.', true); return; }
         render(res[0].data, res[1].data);
+        renderSenate(res[2].error ? null : res[2].data, res[3].error ? null : res[3].data);
       });
     });
   }
 
-  var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' } };
+  var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' }, red: { name: 'Red Party', color: '#D32F2F' } };
   function party(c) { return PARTIES[c.party] || PARTIES[Object.keys(PARTIES)[0]]; }
 
   function act(promise, okText) {
@@ -96,6 +99,61 @@
         h('div', { 'class': 'acts' },
           h('button', { 'class': 'btn small ghost', type: 'button', text: 'Remove vote', onclick: function () {
             act(sb.from('votes').delete().eq('id', x.id), 'Removed the vote from ' + x.mc_username + '.');
+          } }))));
+    });
+  }
+
+
+  function renderSenate(cands, votes) {
+    var ids = ['sen-pending', 'sen-approved', 'sen-votes'];
+    if (!cands || !votes) {
+      ids.forEach(function (id) { var el = $(id); clear(el); el.appendChild(h('p', { 'class': 'muted', text: 'The senate tables are not set up yet. Run add-senate-and-red.sql in Supabase first.' })); });
+      return;
+    }
+    var pending = cands.filter(function (c) { return !c.approved; });
+    var approved = cands.filter(function (c) { return c.approved; });
+    var byId = {}; cands.forEach(function (c) { byId[c.id] = c; });
+    $('sn-pending').textContent = '(' + pending.length + ')';
+    $('sn-approved').textContent = '(' + approved.length + ')';
+    $('sn-votes').textContent = '(' + votes.length + (votes.length === 500 ? '+' : '') + ')';
+
+    function info(c) { return party(c).name + ' · ' + nationName(c.nation) + ' · username ' + c.mc_username; }
+
+    var p = $('sen-pending'); clear(p);
+    if (!pending.length) p.appendChild(h('p', { 'class': 'muted', text: 'Nobody is waiting.' }));
+    pending.forEach(function (c) {
+      p.appendChild(h('div', { 'class': 'item' },
+        h('div', { 'class': 'who' }, h('b', { text: c.name }), h('span', { text: info(c) }), c.pitch ? h('span', { text: c.pitch }) : null),
+        h('div', { 'class': 'acts' },
+          h('button', { 'class': 'btn small', type: 'button', text: 'Approve', onclick: function () {
+            act(sb.from('senate_candidates').update({ approved: true }).eq('id', c.id), c.name + ' is on the ' + nationName(c.nation) + ' senate ballot.');
+          } }),
+          h('button', { 'class': 'btn small danger', type: 'button', text: 'Reject', onclick: function () {
+            if (confirm('Reject and delete ' + c.name + '?')) act(sb.from('senate_candidates').delete().eq('id', c.id), c.name + ' was rejected.');
+          } }))));
+    });
+
+    var a = $('sen-approved'); clear(a);
+    if (!approved.length) a.appendChild(h('p', { 'class': 'muted', text: 'No approved senate candidates yet.' }));
+    approved.forEach(function (c) {
+      a.appendChild(h('div', { 'class': 'item' },
+        h('div', { 'class': 'who' }, h('b', null, h('span', { 'class': 'sw', style: 'background:' + party(c).color }), c.name), h('span', { text: info(c) })),
+        h('div', { 'class': 'acts' },
+          h('button', { 'class': 'btn small danger', type: 'button', text: 'Remove', onclick: function () {
+            if (confirm('Remove ' + c.name + ' and all of their votes?')) act(sb.from('senate_candidates').delete().eq('id', c.id), c.name + ' was removed.');
+          } }))));
+    });
+
+    var v = $('sen-votes'); clear(v);
+    if (!votes.length) v.appendChild(h('p', { 'class': 'muted', text: 'No senate votes yet.' }));
+    votes.forEach(function (x) {
+      var who = byId[x.candidate_id] ? byId[x.candidate_id].name : 'Unknown';
+      v.appendChild(h('div', { 'class': 'item' },
+        h('div', { 'class': 'who' }, h('b', { text: x.mc_username }),
+          h('span', { text: 'Voted ' + who + ' · ' + nationName(x.nation) + ' · ' + new Date(x.created_at).toLocaleString() })),
+        h('div', { 'class': 'acts' },
+          h('button', { 'class': 'btn small ghost', type: 'button', text: 'Remove vote', onclick: function () {
+            act(sb.from('senate_votes').delete().eq('id', x.id), 'Removed the senate vote from ' + x.mc_username + '.');
           } }))));
     });
   }

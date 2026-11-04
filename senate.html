@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senate | World Election</title>
+<meta name="description" content="Senate election results and voting. Every nation elects its own senators.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Source+Serif+4:wght@600;700&amp;display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the senate</a>
+<div id="demo-banner" class="banner" hidden>Demo mode: this is sample data and nothing is saved. Add your Supabase keys in <code>js/config.js</code> to go live.</div>
+<div id="load-error" class="banner err" role="alert" hidden></div>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="brand"><span class="logo-tile"><img src="logo.png" alt="TC server logo" width="58" height="43"></span><span>World Election</span></div>
+    <nav class="nav" aria-label="Elections"><a href="index.html">President</a><a href="senate.html" aria-current="page">Senate</a></nav>
+    <div class="live">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="live-text">Live results</span>
+      <button id="refresh" class="link-btn" type="button">Refresh</button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section class="hero" aria-labelledby="race-title">
+    <div>
+      <p class="eyebrow">Senate election</p>
+      <h1 id="race-title">The Senate</h1>
+      <p id="headline" class="headline" aria-live="polite"></p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="stat-votes">0</b><span>Senate votes</span></div>
+      <div class="stat"><b id="stat-nations">0 of 9</b><span>Nations reporting</span></div>
+      <div class="stat"><b id="stat-seats">0 of 18</b><span>Seats decided</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="id-card" style="margin-bottom: 24px" aria-labelledby="id-h">
+    <h2 id="id-h"><span class="stepno" aria-hidden="true">1</span>Who are you?</h2>
+    <p class="muted">Every nation elects its own senators, so you vote in the nation you pick here. Enter your Minecraft username and choose your nation to see your ballot.</p>
+    <form id="id-form" novalidate style="max-width: 640px">
+      <div class="field">
+        <label for="s-name">Minecraft username</label>
+        <input id="s-name" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32" required>
+      </div>
+      <div class="field">
+        <label for="s-nation">Your nation</label>
+        <select id="s-nation" required></select>
+      </div>
+      <button id="s-go" class="btn" type="submit">Show my ballot</button>
+      <div id="s-msg" class="msg" role="status"></div>
+    </form>
+  </section>
+
+  <section class="card" id="ballot" style="margin-bottom: 24px" aria-live="polite" hidden></section>
+
+  <section class="card" style="margin-bottom: 24px" aria-labelledby="control-h">
+    <h2 id="control-h">Who controls the Senate?</h2>
+    <p id="control-sub" class="muted"></p>
+    <div class="seatwrap"><div id="seatbar" class="seatbar" role="img" aria-label="Seats won by each party"></div><div id="maj" class="maj" hidden></div></div>
+    <div id="majlbl" class="majlbl"></div>
+    <div id="seatlist" class="seatlist"></div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <div class="card-head">
+        <h2>Seats by nation</h2>
+        <p class="muted">Each nation elects its own senators. Select a nation for its candidates and vote counts.</p>
+      </div>
+      <div id="map-wrap" class="map-wrap">
+        <svg id="map" role="group" aria-label="Map of the nations, coloured by the party that won its senate seats"></svg>
+        <div id="tip" class="tip" hidden></div>
+      </div>
+      <div id="legend" class="legend"></div>
+    </div>
+    <aside id="panel" class="card panel" aria-live="polite"></aside>
+  </section>
+
+  <section class="card" style="margin-bottom: 24px">
+    <h2>Senators nation by nation</h2>
+    <div class="table-wrap" style="margin-top: 12px">
+      <table>
+        <thead><tr><th scope="col">Nation</th><th scope="col">Senators winning right now</th><th scope="col" class="n">Votes</th></tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="run-card" style="margin-bottom: 24px; max-width: 640px">
+    <h2>Run for senate</h2>
+    <p class="muted">You run in one nation and appear on that nation's ballot once an admin approves you.</p>
+    <form id="run-form" novalidate>
+      <div class="field">
+        <label for="n-name">Candidate name</label>
+        <input id="n-name" type="text" maxlength="40" required>
+      </div>
+      <div class="field">
+        <label for="n-user">Minecraft username</label>
+        <input id="n-user" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32" required>
+      </div>
+      <div class="field">
+        <label for="n-nation">Nation you are running in</label>
+        <select id="n-nation" required></select>
+      </div>
+      <fieldset>
+        <legend>Your party</legend>
+        <div id="n-parties" class="rows"></div>
+      </fieldset>
+      <div class="field">
+        <label for="n-pitch">One-line pitch <span class="muted">(optional)</span></label>
+        <textarea id="n-pitch" maxlength="140"></textarea>
+        <span class="hint">Up to 140 characters.</span>
+      </div>
+      <div class="hp" aria-hidden="true"><label>Leave blank <input id="n-hp" type="text" tabindex="-1" autocomplete="off"></label></div>
+      <button id="n-submit" class="btn ghost" type="submit">Put me on the ballot</button>
+      <div id="n-msg" class="msg" role="status"></div>
+    </form>
+    <div id="run-locked" class="locked" hidden>Polls are closed, so sign-ups are closed too.</div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>Each nation elects its own senators. The top candidates in a nation win its seats. <span id="updated"></span></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="settings.js"></script>
+<script src="map-data.js"></script>
+<script src="common.js"></script>
+<script src="senate.js"></script>
+</body>
+</html>
