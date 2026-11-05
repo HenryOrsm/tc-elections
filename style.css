@@ -171,3 +171,12 @@ footer { padding: 8px 0 48px; color: var(--muted); font-size: 14px; }
 .item select { max-width: 340px; margin-top: 6px; }
 
 [hidden]{display:none!important}
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 12px; }
+.facts dt { color: var(--muted); font-size: 14px; }
+.facts dd { margin: 0; font-weight: 600; }
+a.chip { padding: 6px 12px; border: 1px solid var(--line, #d5dbe5); border-radius: 999px; text-decoration: none; color: inherit; font-weight: 600; }
+a.chip:hover { background: #eef2f8; }
+.row { margin-bottom: 2px; }
+.item textarea { width: 100%; min-height: 70px; }
+.item input[type=text] { width: 100%; }
+.item .who b { display: flex; align-items: center; gap: 8px; }

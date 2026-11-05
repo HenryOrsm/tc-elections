@@ -203,8 +203,8 @@
       refs[r.id] = { g: g, path: path, text: text, l1: l1, l2: l2, call: !!call, region: r };
 
       if (claim) {
-        g.addEventListener('click', function () { select(r.id); });
-        g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.id); } });
+        g.addEventListener('click', function () { openNation(r.id); });
+        g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNation(r.id); } });
         g.addEventListener('pointerenter', function (e) { showTip(r.id, e); });
         g.addEventListener('pointermove', function (e) { moveTip(e); });
         g.addEventListener('pointerleave', hideTip);
@@ -267,6 +267,7 @@
   }
   function hideTip() { if (tip) tip.hidden = true; }
 
+  function openNation(id) { location.href = 'nation.html?n=' + encodeURIComponent(id); }
   function select(id) { state.selected = state.selected === id ? null : id; renderAll(); }
 
   /* ---------- panels ---------- */
@@ -314,7 +315,7 @@
       p.appendChild(h('button', { 'class': 'btn ghost small', type: 'button', style: 'margin-top:16px', text: 'Back to world total', onclick: function () { select(state.selected); } }));
     } else {
       p.appendChild(h('h2', { text: 'World total' }));
-      p.appendChild(h('p', { 'class': 'sub', text: EL.num(t.total) + ' votes in all. Select a nation on the map for its own breakdown.' }));
+      p.appendChild(h('p', { 'class': 'sub', text: EL.num(t.total) + ' votes in all. Click a nation on the map for its own page.' }));
       p.appendChild(h('h3', { 'class': 'sect', text: 'By party' })); p.appendChild(partyBars(t.byCand, t.total));
       p.appendChild(h('h3', { 'class': 'sect', text: 'By candidate' })); p.appendChild(bars(t.byCand, t.total));
     }

@@ -31,11 +31,13 @@
         sb.from('candidates').select('*').order('created_at', { ascending: true }),
         sb.from('votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500),
         sb.from('senate_candidates').select('*').order('created_at', { ascending: true }),
-        sb.from('senate_votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500)
+        sb.from('senate_votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500),
+        sb.from('nation_info').select('*')
       ]).then(function (res) {
         if (res[0].error || res[1].error) { say('dash-msg', 'Could not load data.', true); return; }
         render(res[0].data, res[1].data);
         renderSenate(res[2].error ? null : res[2].data, res[3].error ? null : res[3].data);
+        renderNations(res[4].error ? null : res[4].data);
       });
     });
   }
@@ -187,6 +189,25 @@
     votes.forEach(function (x) {
       var who = byId[x.candidate_id] ? byId[x.candidate_id].name : 'Unknown';
       v.appendChild(voteRow('senate_votes', x, cands, who, false));
+    });
+  }
+
+  function renderNations(rows) {
+    var box = $('nation-info'); clear(box);
+    if (!rows) { box.appendChild(h('p', { 'class': 'muted', text: 'The nation info table is not set up yet. Run add-nation-info.sql in Supabase first.' })); return; }
+    var byN = {}; rows.forEach(function (r) { byN[r.nation] = r; });
+    nationIds().forEach(function (n) {
+      var cur = byN[n] || {};
+      var leader = h('input', { type: 'text', maxlength: 60, value: cur.leader || '', placeholder: 'Leader', 'aria-label': nationName(n) + ' leader' });
+      var capital = h('input', { type: 'text', maxlength: 60, value: cur.capital || '', placeholder: 'Capital', 'aria-label': nationName(n) + ' capital' });
+      var blurb = h('textarea', { maxlength: 500, placeholder: 'Short description', 'aria-label': nationName(n) + ' description' });
+      blurb.value = cur.blurb || '';
+      box.appendChild(h('div', { 'class': 'item', style: 'display:block' },
+        h('div', { 'class': 'who' }, h('b', { text: nationName(n) }), leader, capital, blurb),
+        h('div', { 'class': 'acts', style: 'margin-top:8px' },
+          h('button', { 'class': 'btn small', type: 'button', text: 'Save', onclick: function () {
+            act(sb.from('nation_info').upsert({ nation: n, leader: leader.value.trim() || null, capital: capital.value.trim() || null, blurb: blurb.value.trim() || null, updated_at: new Date().toISOString() }), nationName(n) + ' saved.');
+          } }))));
     });
   }
 

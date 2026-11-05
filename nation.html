@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nation | World Election</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Source+Serif+4:wght@600;700&amp;display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="demo-banner" class="banner" hidden>Demo mode: this is sample data. Add your Supabase keys in <code>js/config.js</code> to go live.</div>
+<div id="load-error" class="banner err" role="alert" hidden></div>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="brand"><span class="logo-tile"><img src="logo.png" alt="TC server logo" width="58" height="43"></span><span>World Election</span></div>
+    <nav class="nav" aria-label="Elections"><a href="index.html">President</a><a href="senate.html">Senate</a></nav>
+    <div class="live"><a href="index.html" style="color:#fff">Back to the map</a></div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Nation</p>
+      <h1 id="n-title">Nation</h1>
+      <p id="n-headline" class="headline"></p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="st-pres">0</b><span>President votes</span></div>
+      <div class="stat"><b id="st-sen">0</b><span>Senate votes</span></div>
+      <div class="stat"><b id="st-share">0%</b><span>Of all president votes</span></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="card" id="info-card">
+      <h2>About</h2>
+      <dl id="info" class="facts"></dl>
+      <p id="blurb" class="muted"></p>
+    </div>
+    <aside class="card" aria-label="Where this nation is">
+      <svg id="mini" role="img" aria-label="Outline of this nation" style="width:100%;height:auto;max-height:260px"></svg>
+    </aside>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>President: how this nation voted</h2>
+      <div id="pres"></div>
+    </div>
+    <div class="card">
+      <h2>Senate: this nation's seats</h2>
+      <div id="sen"></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom: 24px">
+    <h2>Candidates from here</h2>
+    <div id="cands"></div>
+  </section>
+
+  <section class="card" style="margin-bottom: 24px">
+    <h2>Other nations</h2>
+    <div id="others" class="chips"></div>
+  </section>
+</main>
+
+<footer class="wrap"><p>Numbers update every few seconds. <span id="updated"></span></p></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="settings.js"></script>
+<script src="map-data.js"></script>
+<script src="common.js"></script>
+<script src="nation.js"></script>
+</body>
+</html>

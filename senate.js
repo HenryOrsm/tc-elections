@@ -185,8 +185,8 @@
       svg.appendChild(g);
       refs[r.id] = { g: g, path: path, text: text, l1: l1, l2: l2, call: !!call };
       if (claim) {
-        g.addEventListener('click', function () { select(r.id); });
-        g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.id); } });
+        g.addEventListener('click', function () { openNation(r.id); });
+        g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNation(r.id); } });
         g.addEventListener('pointerenter', function (e) { showTip(r.id, e); });
         g.addEventListener('pointermove', moveTip);
         g.addEventListener('pointerleave', hideTip);
@@ -254,6 +254,7 @@
     tip.style.left = x + 'px'; tip.style.top = y + 'px';
   }
   function hideTip() { if (tip) tip.hidden = true; }
+  function openNation(id) { location.href = 'nation.html?n=' + encodeURIComponent(id); }
   function select(id) { state.selected = state.selected === id ? null : id; renderAll(); }
 
   /* ---------- panels ---------- */
@@ -282,7 +283,7 @@
       p.appendChild(h('button', { 'class': 'btn ghost small', type: 'button', style: 'margin-top:16px', text: 'Back to all seats', onclick: function () { select(state.selected); } }));
     } else {
       p.appendChild(h('h2', { text: 'All seats' }));
-      p.appendChild(h('p', { 'class': 'sub', text: t.filled + ' of ' + SEATS_TOTAL + ' seats decided. Select a nation on the map for its candidates.' }));
+      p.appendChild(h('p', { 'class': 'sub', text: t.filled + ' of ' + SEATS_TOTAL + ' seats decided. Click a nation on the map for its own page.' }));
       var rs = h('div', { 'class': 'rows' });
       PARTY_IDS.slice().sort(function (a, b) { return t.seatsBy[b] - t.seatsBy[a]; }).forEach(function (k) {
         rs.appendChild(barRow(PARTIES[k].name, PARTIES[k].color, t.seatsBy[k], SEATS_TOTAL ? t.seatsBy[k] / SEATS_TOTAL : 0));
