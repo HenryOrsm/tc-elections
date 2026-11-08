@@ -78,10 +78,10 @@
     },
     adminVote: function (v) {
       if (demo) {
-        demoData.votes.push({ mc: 'admin_test_' + Math.random().toString(36).slice(2, 10), nation: v.nation, cand: v.candidateId });
+        for (var i = 0; i < (v.count || 1); i++) demoData.votes.push({ mc: 'admin_test_' + Math.random().toString(36).slice(2, 10), nation: v.nation, cand: v.candidateId });
         return Promise.resolve();
       }
-      return sb.rpc('admin_cast_senate_vote', { p_nation: v.nation, p_candidate: v.candidateId })
+      return sb.rpc('admin_cast_senate_vote', { p_nation: v.nation, p_candidate: v.candidateId, p_count: v.count || 1 })
         .then(function (r) { if (r.error) throw r.error; });
     },
     signup: function (c) {
@@ -94,6 +94,7 @@
   /* ---------- state + tallies ---------- */
   var state = { candidates: [], results: [], selected: null, me: null, ballotKey: '', voted: null };
   var isAdmin = false;
+  var bulk = EL.bulkPicker(1);
 
   // One senate vote per person: after voting, this browser is locked out. Admins are exempt.
   var LOCK_KEY = 'voted-senate';
@@ -422,16 +423,16 @@
       });
       var vmsg = h('div', { 'class': 'msg', role: 'status' });
       var btn = h('button', { 'class': 'btn', type: 'submit', text: 'Cast my senate vote' });
-      var form = h('form', { novalidate: true, style: 'max-width:640px' }, h('fieldset', null, h('legend', { text: 'Pick one candidate' }), rows), btn, vmsg);
+      var form = h('form', { novalidate: true, style: 'max-width:640px' }, h('fieldset', null, h('legend', { text: 'Pick one candidate' }), rows), isAdmin ? bulk.el : null, btn, vmsg);
       form.addEventListener('submit', function (e) {
         e.preventDefault();
         var pick = document.querySelector('input[name=sen]:checked');
         if (!pick) { vmsg.textContent = 'Pick a candidate.'; vmsg.className = 'msg err'; return; }
         btn.disabled = true; vmsg.textContent = 'Sending...'; vmsg.className = 'msg';
-        var req = isAdmin ? api.adminVote({ nation: n, candidateId: pick.value })
+        var req = isAdmin ? api.adminVote({ nation: n, candidateId: pick.value, count: bulk.get() })
                           : api.vote({ name: state.me.name, nation: n, candidateId: pick.value });
         req.then(function () {
-          if (isAdmin) { vmsg.textContent = 'Admin test vote counted. Vote as many times as you like.'; vmsg.className = 'msg'; }
+          if (isAdmin) { vmsg.textContent = bulk.get().toLocaleString() + ' admin test ' + (bulk.get() === 1 ? 'vote' : 'votes') + ' counted. Vote as many times as you like.'; vmsg.className = 'msg'; }
           else { setLock(state.me.name); state.voted = pick.getAttribute('data-name'); renderGate(); }
           return refresh();
         }).catch(function (err) { vmsg.textContent = friendly(err); vmsg.className = 'msg err'; })

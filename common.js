@@ -72,5 +72,38 @@
     }).catch(function () { return false; });
   }
 
-  window.EL = { checkAdmin: checkAdmin, h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
+  // Admin-only "how many votes" control: preset chips, a log-scale slider and a typeable box, all kept in sync.
+  var PRESETS = [1, 5, 10, 50, 100, 500, 1000, 5000, 10000];
+  function bulkPicker(initial) {
+    var MAXV = 10000, count = initial || 1;
+    function toSlider(n) { return Math.round(Math.log(n) / Math.log(MAXV) * 1000); }
+    function fromSlider(v) { return Math.max(1, Math.min(MAXV, Math.round(Math.pow(MAXV, v / 1000)))); }
+    var num = h('input', { type: 'number', min: 1, max: MAXV, step: 1, value: count, id: 'bulk-num', 'aria-label': 'Number of votes', style: 'width:110px' });
+    var range = h('input', { type: 'range', min: 0, max: 1000, step: 1, value: toSlider(count), 'aria-label': 'Number of votes slider', style: 'width:100%' });
+    var chips = h('div', { 'class': 'chips', style: 'margin:8px 0' });
+    var note = h('div', { 'class': 'hint' });
+    var btns = [];
+    function set(n, from) {
+      n = Math.round(Number(n)); if (!isFinite(n)) n = 1;
+      count = Math.max(1, Math.min(MAXV, n));
+      if (from !== 'num') num.value = count;
+      if (from !== 'range') range.value = toSlider(count);
+      btns.forEach(function (b) { b.el.setAttribute('aria-pressed', b.n === count ? 'true' : 'false'); b.el.className = 'btn small' + (b.n === count ? '' : ' ghost'); });
+      note.textContent = count === 1 ? 'Casts 1 test vote.' : 'Casts ' + count.toLocaleString() + ' test votes, all for the candidate you pick.';
+    }
+    PRESETS.forEach(function (n) {
+      var b = h('button', { type: 'button', text: n.toLocaleString(), onclick: function () { set(n); } });
+      btns.push({ n: n, el: b }); chips.appendChild(b);
+    });
+    num.addEventListener('input', function () { if (num.value !== '') set(num.value, 'num'); });
+    num.addEventListener('blur', function () { set(num.value || 1); });
+    range.addEventListener('input', function () { set(fromSlider(Number(range.value)), 'range'); });
+    set(count);
+    var el = h('div', { 'class': 'field bulk' },
+      h('label', { 'for': 'bulk-num', text: 'How many votes? (1 to 10,000)' }), chips, range,
+      h('div', { style: 'margin-top:8px' }, num), note);
+    return { el: el, get: function () { set(num.value || count); return count; } };
+  }
+
+  window.EL = { bulkPicker: bulkPicker, checkAdmin: checkAdmin, h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
 })();

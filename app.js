@@ -91,10 +91,10 @@
     },
     adminVote: function (v) {
       if (demo) {
-        demoData.votes.push({ mc: 'admin_test_' + Math.random().toString(36).slice(2, 10), nation: v.nation, cand: v.candidateId });
+        for (var i = 0; i < (v.count || 1); i++) demoData.votes.push({ mc: 'admin_test_' + Math.random().toString(36).slice(2, 10), nation: v.nation, cand: v.candidateId });
         return Promise.resolve();
       }
-      return sb.rpc('admin_cast_vote', { p_nation: v.nation, p_candidate: v.candidateId })
+      return sb.rpc('admin_cast_vote', { p_nation: v.nation, p_candidate: v.candidateId, p_count: v.count || 1 })
         .then(function (r) { if (r.error) throw r.error; });
     },
     signup: function (c) {
@@ -107,6 +107,7 @@
   /* ---------- state + tallies ---------- */
   var state = { candidates: [], results: [], selected: null, lastCandKey: '', voteNote: '' };
   var isAdmin = false;
+  var bulk = EL.bulkPicker(1);
 
   // One vote per person: after voting, this browser is locked out of the form. Admins are exempt.
   var LOCK_KEY = 'voted-president';
@@ -394,6 +395,8 @@
     box.textContent = closed ? 'Polls are closed. Thanks for voting.'
       : (state.voteNote || 'You have already voted in the presidential election on this device. It is one vote per person. If something went wrong, ask an admin to change your vote.');
     $('admin-note').hidden = !isAdmin;
+    if (!bulk.el.parentNode) $('v-submit').parentNode.insertBefore(bulk.el, $('v-submit'));
+    bulk.el.hidden = !isAdmin;
     $('v-name').closest('.field').hidden = isAdmin;
   }
 
@@ -480,11 +483,11 @@
     if (!nation) return msg('v-msg', 'Choose your nation.', true);
     if (!pick) return msg('v-msg', 'Pick a candidate.', true);
     var btn = $('v-submit'); btn.disabled = true; msg('v-msg', 'Sending...', false);
-    var req = isAdmin ? api.adminVote({ nation: nation, candidateId: pick.value })
+    var req = isAdmin ? api.adminVote({ nation: nation, candidateId: pick.value, count: bulk.get() })
                       : api.vote({ name: name, nation: nation, candidateId: pick.value });
     req.then(function () {
       if (isAdmin) {
-        msg('v-msg', 'Admin test vote counted. Vote as many times as you like.', false);
+        msg('v-msg', bulk.get().toLocaleString() + ' admin test ' + (bulk.get() === 1 ? 'vote' : 'votes') + ' counted. Vote as many times as you like.', false);
       } else {
         setLock(name);
         state.voteNote = 'Vote counted. Thanks, ' + name + '! It is one vote per person, so voting is now locked on this device. If something went wrong, ask an admin to change your vote.';

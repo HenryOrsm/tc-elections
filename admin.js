@@ -29,15 +29,19 @@
       showDash(true);
       return Promise.all([
         sb.from('candidates').select('*').order('created_at', { ascending: true }),
-        sb.from('votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500),
+        sb.from('votes').select('id,mc_username,nation,candidate_id,created_at').not('mc_username', 'like', 'admin_test_%').order('created_at', { ascending: false }).limit(500),
         sb.from('senate_candidates').select('*').order('created_at', { ascending: true }),
-        sb.from('senate_votes').select('id,mc_username,nation,candidate_id,created_at').order('created_at', { ascending: false }).limit(500),
-        sb.from('nation_info').select('*')
+        sb.from('senate_votes').select('id,mc_username,nation,candidate_id,created_at').not('mc_username', 'like', 'admin_test_%').order('created_at', { ascending: false }).limit(500),
+        sb.from('nation_info').select('*'),
+        sb.from('votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%'),
+        sb.from('senate_votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%')
       ]).then(function (res) {
         if (res[0].error || res[1].error) { say('dash-msg', 'Could not load data.', true); return; }
         render(res[0].data, res[1].data);
         renderSenate(res[2].error ? null : res[2].data, res[3].error ? null : res[3].data);
         renderNations(res[4].error ? null : res[4].data);
+        $('test-count').textContent = (res[5].count || 0).toLocaleString() + ' admin test votes are hidden from this list.';
+        $('test-count-sen').textContent = (res[6].count || 0).toLocaleString() + ' admin test votes are hidden from this list.';
       });
     });
   }

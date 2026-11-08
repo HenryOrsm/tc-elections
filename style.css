@@ -180,3 +180,5 @@ a.chip:hover { background: #eef2f8; }
 .item textarea { width: 100%; min-height: 70px; }
 .item input[type=text] { width: 100%; }
 .item .who b { display: flex; align-items: center; gap: 8px; }
+.bulk .chips button { min-width: 52px; }
+.bulk input[type=range] { accent-color: var(--navy, #0b2040); }
