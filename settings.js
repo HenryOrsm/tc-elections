@@ -1,7 +1,7 @@
 /*
   Nation names, parties and senate rules. Loaded after config.js and wins over it,
   so you can change these without ever touching your Supabase keys.
-  Change only the names/colours/numbers on the right. Do NOT change the ids on the left.
+  Change only the names/short names/colours/numbers on the right. Do NOT change the ids on the left.
 */
 (function () {
   var c = window.ELECTION_CONFIG = window.ELECTION_CONFIG || {};
@@ -18,10 +18,10 @@
     "igt-town": "IGT Town"
   };
   c.parties = {
-    "blue": { name: "Blue Party", color: "#1063DF" },
-    "gold": { name: "Gold Party", color: "#DDAA22" },
-    "red":  { name: "Red Party",  color: "#D32F2F" },
-    "green": { name: "Green Party", color: "#2E9E4F" }
+    "blue": { name: "The Toner Campaign", short: "Toner", color: "#1063DF" },
+    "gold": { name: "Og for Aljanna", short: "Og", color: "#DDAA22" },
+    "red":  { name: "Literal Russian Communism", short: "Communism",  color: "#D32F2F" },
+    "green": { name: "MAGA (Make Aljanna Great Again)", short: "MAGA", color: "#2E9E4F" }
   };
   // Senate seats each nation elects. The top candidates in that nation win.
   c.senateSeatsPerNation = 2;

@@ -11,7 +11,7 @@
   var SEATS_TOTAL = SEATS * CLAIMABLE.length;
 
   function nationName(id) { return (CFG.nations && CFG.nations[id]) || id; }
-  function partyShort(k) { return (PARTIES[k] ? PARTIES[k].name : k).replace(/ Party$/, ''); }
+  function partyShort(k) { var p = PARTIES[k]; return p ? (p.short || p.name.replace(/ Party$/, '')) : k; }
   function withParty(c) {
     if (!PARTIES[c.party]) c.party = PARTY_IDS[0];
     c.color = PARTIES[c.party].color; c.partyName = PARTIES[c.party].name;
