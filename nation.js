@@ -15,6 +15,9 @@
   N = N ? decodeURIComponent(N) : '';
   var region = null;
   MAP.regions.forEach(function (r) { if (r.id === N) region = r; });
+  var EXC = (CFG.senateExcluded || []).indexOf(N) !== -1;
+  var NSEATS = EXC ? 0 : (CFG.senateSeats && CFG.senateSeats[N] !== undefined ? Number(CFG.senateSeats[N]) : SEATS);
+
 
   var configured = CFG.supabaseUrl && CFG.supabaseAnonKey &&
     CFG.supabaseUrl.indexOf('PASTE') === -1 && CFG.supabaseAnonKey.indexOf('PASTE') === -1 && window.supabase;
@@ -113,16 +116,17 @@
     var sc = D.scands.filter(function (c) { return c.nation === N; }).map(function (c) { return { c: c, v: sv[c.id] || 0 }; });
     sc.sort(function (a, b) { return b.v - a.v || (a.c.name < b.c.name ? -1 : 1); });
     var winners = [], stied = false;
-    if (stotal) {
-      var withVotes = sc.filter(function (x) { return x.v > 0; }).length, seats = Math.min(SEATS, withVotes);
+    if (stotal && NSEATS > 0) {
+      var withVotes = sc.filter(function (x) { return x.v > 0; }).length, seats = Math.min(NSEATS, withVotes);
       if (sc.length > seats && sc[seats - 1].v === sc[seats].v && sc[seats].v > 0) {
         stied = true; var cut = sc[seats - 1].v; winners = sc.filter(function (x) { return x.v > cut; });
       } else winners = sc.slice(0, seats);
     }
     var sen = $('sen'); clear(sen);
-    if (!sc.length) sen.appendChild(empty('No senate candidates here yet.'));
+    if (NSEATS === 0) { sen.appendChild(empty('This nation has no senate seats for now.')); sc = []; stotal = 0; }
+    else if (!sc.length) sen.appendChild(empty('No senate candidates here yet.'));
     else {
-      sen.appendChild(h('p', { 'class': 'muted', text: 'The top ' + SEATS + ' win a seat.' + (stied ? ' The last seat is tied.' : '') }));
+      sen.appendChild(h('p', { 'class': 'muted', text: 'The top ' + NSEATS + ' win a seat.' + (stied ? ' The last seat is tied.' : '') }));
       var rs = h('div', { 'class': 'rows' });
       sc.forEach(function (x) { rs.appendChild(barRow(x.c.name, party(x.c.party).color, x.v, stotal ? x.v / stotal : 0, winners.indexOf(x) !== -1 ? 'Seat' : null)); });
       sen.appendChild(rs);

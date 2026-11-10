@@ -25,4 +25,12 @@
   };
   // Senate seats each nation elects. The top candidates in that nation win.
   c.senateSeatsPerNation = 2;
+  // Seats per nation. Any nation not listed here gets senateSeatsPerNation. 0 = no senators for now.
+  c.senateSeats = {
+    "maradon": 2, "cecilia": 2, "narellan": 2,
+    "goldleaf": 0, "dyonisia": 0, "island-a": 0, "eldonia": 0, "island-b": 0,
+    "seafaria": 0
+  };
+  // Greyed out on the senate map like IGT Town: no seats, no voting, no candidates.
+  c.senateExcluded = ["seafaria"];
 })();

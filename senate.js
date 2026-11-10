@@ -8,7 +8,15 @@
   var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' }, red: { name: 'Red Party', color: '#D32F2F' } };
   var PARTY_IDS = Object.keys(PARTIES);
   var CLAIMABLE = MAP.regions.filter(function (r) { return r.claimable; }).map(function (r) { return r.id; });
-  var SEATS_TOTAL = SEATS * CLAIMABLE.length;
+  var EXCLUDED = {}; (CFG.senateExcluded || []).forEach(function (id) { EXCLUDED[id] = true; });
+  function seatsOf(n) {
+    if (EXCLUDED[n]) return 0;
+    var m = CFG.senateSeats;
+    return m && m[n] !== undefined ? Number(m[n]) : SEATS;
+  }
+  var LISTED = CLAIMABLE.filter(function (n) { return !EXCLUDED[n]; });          // shown on the map and table
+  var SEATED = LISTED.filter(function (n) { return seatsOf(n) > 0; });            // can vote and run
+  var SEATS_TOTAL = SEATED.reduce(function (a, n) { return a + seatsOf(n); }, 0);
 
   function nationName(id) { return (CFG.nations && CFG.nations[id]) || id; }
   function partyShort(k) { var p = PARTIES[k]; return p ? (p.short || p.name.replace(/ Party$/, '')) : k; }
@@ -113,9 +121,9 @@
     cs.sort(function (a, b) { return b.votes - a.votes || (a.c.name < b.c.name ? -1 : 1); });
     var total = cs.reduce(function (a, x) { return a + x.votes; }, 0);
     var winners = [], tied = false;
-    if (total > 0) {
+    if (total > 0 && seatsOf(n) > 0) {
       var withVotes = cs.filter(function (x) { return x.votes > 0; }).length;
-      var seats = Math.min(SEATS, withVotes);
+      var seats = Math.min(seatsOf(n), withVotes);
       if (cs.length > seats && cs[seats - 1].votes === cs[seats].votes && cs[seats].votes > 0) {
         tied = true;                                   // a tie for the last seat: leave it open
         var cutoff = cs[seats - 1].votes;
@@ -130,10 +138,10 @@
     state.results.forEach(function (r) { votesOf[r.candidate_id] = (votesOf[r.candidate_id] || 0) + Number(r.votes); });
     var byNation = {}, seatsBy = {}, total = 0, reporting = 0, filled = 0;
     PARTY_IDS.forEach(function (k) { seatsBy[k] = 0; });
-    CLAIMABLE.forEach(function (n) {
+    LISTED.forEach(function (n) {
       var res = nationResult(n, votesOf);
-      byNation[n] = res; total += res.total;
-      if (res.total > 0) reporting++;
+      byNation[n] = res; if (seatsOf(n) > 0) total += res.total;
+      if (res.total > 0 && seatsOf(n) > 0) reporting++;
       res.winners.forEach(function (w) { seatsBy[w.c.party] += 1; filled++; });
     });
     return { byNation: byNation, seatsBy: seatsBy, total: total, reporting: reporting, filled: filled };
@@ -167,7 +175,7 @@
     }
     svg.appendChild(defs);
     MAP.regions.forEach(function (r) {
-      var claim = r.claimable;
+      var claim = r.claimable && !EXCLUDED[r.id];
       var g = s('g', { 'class': 'region' + (claim ? '' : ' fixed'), 'data-id': r.id });
       if (claim) { g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button'); }
       var path = s('path', { d: r.d, 'fill-rule': 'evenodd', fill: claim ? NO_VOTES : 'url(#hatch)' });
@@ -213,9 +221,10 @@
   function paintMap(t) {
     MAP.regions.forEach(function (r) {
       var ref = refs[r.id], label = nationName(r.id);
-      if (!r.claimable) { setLabel(ref, label, 'Spawn', '#3C4658', false); return; }
+      if (!r.claimable || EXCLUDED[r.id]) { setLabel(ref, label, r.claimable ? 'No senate' : 'Spawn', '#3C4658', false); return; }
       var res = t.byNation[r.id], fill = NO_VOTES, line2 = 'No votes', striped = false, summary = 'no votes yet';
-      if (res.total > 0) {
+      if (seatsOf(r.id) === 0) { line2 = 'No seats yet'; summary = 'no senate seats yet'; }
+      else if (res.total > 0) {
         if (!res.winners.length) { fill = TIED; line2 = 'Tied'; summary = 'tied'; }
         else {
           var ps = winnerParties(res);
@@ -272,7 +281,7 @@
     if (state.selected) {
       var res = t.byNation[state.selected];
       p.appendChild(h('h2', { text: nationName(state.selected) }));
-      p.appendChild(h('p', { 'class': 'sub', text: EL.num(res.total) + (res.total === 1 ? ' vote' : ' votes') + '. The top ' + SEATS + ' win a seat.' + (res.tied ? ' The last seat is tied.' : '') }));
+      p.appendChild(h('p', { 'class': 'sub', text: EL.num(res.total) + (res.total === 1 ? ' vote' : ' votes') + '. The top ' + seatsOf(state.selected) + ' win a seat.' + (res.tied ? ' The last seat is tied.' : '') }));
       if (!res.cands.length) p.appendChild(h('p', { text: 'No senate candidates here yet.' }));
       else {
         var rows = h('div', { 'class': 'rows' });
@@ -323,7 +332,7 @@
 
   function renderHero(t) {
     $('stat-votes').textContent = EL.num(t.total);
-    $('stat-nations').textContent = t.reporting + ' of ' + CLAIMABLE.length;
+    $('stat-nations').textContent = t.reporting + ' of ' + SEATED.length;
     $('stat-seats').textContent = t.filled + ' of ' + SEATS_TOTAL;
     $('live-text').textContent = pollsClosed() ? 'Final results' : 'Live results';
   }
@@ -340,14 +349,15 @@
     lg.appendChild(h('div', { 'class': 'muted', text: 'Darker = a bigger share of the nation\'s vote' }));
     lg.appendChild(h('div', null, h('span', { 'class': 'sw', style: 'background:' + NO_VOTES }), 'No votes'));
     lg.appendChild(h('div', null, h('span', { 'class': 'sw', style: 'background:' + TIED }), 'Tied'));
-    lg.appendChild(h('div', null, h('span', { 'class': 'sw', style: 'background:#D5DAE3' }), 'Spawn island'));
+    lg.appendChild(h('div', null, h('span', { 'class': 'sw', style: 'background:#D5DAE3' }), 'Spawn island and nations outside the senate'));
   }
 
   function renderTable(t) {
     var body = $('table-body'); clear(body);
-    CLAIMABLE.forEach(function (n) {
+    LISTED.forEach(function (n) {
       var res = t.byNation[n], cell = h('td');
-      if (!res.total) cell.appendChild(h('span', { 'class': 'muted', text: 'No votes yet' }));
+      if (seatsOf(n) === 0) cell.appendChild(h('span', { 'class': 'muted', text: 'No seats yet' }));
+      else if (!res.total) cell.appendChild(h('span', { 'class': 'muted', text: 'No votes yet' }));
       else if (!res.winners.length) cell.appendChild(document.createTextNode('Tied'));
       else {
         var chips = h('div', { 'class': 'chips' });
@@ -357,7 +367,7 @@
       }
       body.appendChild(h('tr', null,
         h('th', { scope: 'row', text: nationName(n), style: 'text-transform:none;letter-spacing:0;font-size:15px;color:inherit;font-weight:600' }),
-        cell, h('td', { 'class': 'n', text: EL.num(res.total) })));
+        cell, h('td', { 'class': 'n', text: seatsOf(n) === 0 ? '-' : EL.num(res.total) })));
     });
   }
 
@@ -372,7 +382,7 @@
       var sel = $(c[0]);
       if (sel.options.length) return;
       sel.appendChild(h('option', { value: '', text: c[1] }));
-      CLAIMABLE.forEach(function (n) { sel.appendChild(h('option', { value: n, text: nationName(n) })); });
+      SEATED.forEach(function (n) { sel.appendChild(h('option', { value: n, text: nationName(n) })); });
     });
     var pbox = $('n-parties');
     if (!pbox.firstChild) {
@@ -405,7 +415,7 @@
     box.hidden = false; clear(box);
 
     box.appendChild(h('h2', null, h('span', { 'class': 'stepno', 'aria-hidden': 'true', text: '2' }), 'Your ballot: ' + nationName(n)));
-    box.appendChild(h('p', { 'class': 'muted', text: 'Voting as ' + state.me.name + '. You get one senate vote. The top ' + SEATS + ' candidates in ' + nationName(n) + ' win a seat.' }));
+    box.appendChild(h('p', { 'class': 'muted', text: 'Voting as ' + state.me.name + '. You get one senate vote. The top ' + seatsOf(n) + ' candidates in ' + nationName(n) + ' win a seat.' }));
 
     if (state.voted) {
       box.appendChild(h('div', { 'class': 'msg', text: 'Vote counted for ' + state.voted + '. Thanks, ' + state.me.name + '!' }));
