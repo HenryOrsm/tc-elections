@@ -23,6 +23,10 @@
     "red":  { name: "Literal Russian Communism", short: "Communism",  color: "#D32F2F" },
     "green": { name: "MAGA (Make Aljanna Great Again)", short: "MAGA", color: "#2E9E4F" }
   };
+  // The main race. Change these three to rename it everywhere (set back for the presidential election).
+  c.raceTitle = "Aljanna Mayor Election";
+  c.raceShort = "Mayor";     // nav tab, labels
+  c.raceLower = "mayor";     // used in sentences, e.g. "Run for mayor"
   // Senate seats each nation elects. The top candidates in that nation win.
   c.senateSeatsPerNation = 2;
   // Seats per nation. Any nation not listed here gets senateSeatsPerNation. 0 = no senators for now.

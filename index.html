@@ -20,7 +20,7 @@
 <header class="topbar">
   <div class="wrap topbar-in">
     <div class="brand"><span class="logo-tile"><img src="logo.png" alt="TC server logo" width="58" height="43"></span><span id="site-title">World Election</span></div>
-    <nav class="nav" aria-label="Elections"><a href="index.html" aria-current="page">President</a><a href="senate.html">Senate</a></nav>
+    <nav class="nav" aria-label="Elections"><a href="index.html" aria-current="page"><span data-race="short">President</span></a><a href="senate.html">Senate</a></nav>
     <div class="live">
       <span class="dot" aria-hidden="true"></span>
       <span id="live-text">Live results</span>
@@ -33,7 +33,7 @@
   <section class="hero" aria-labelledby="race-title">
     <div>
       <p class="eyebrow">Election results</p>
-      <h1 id="race-title">Leader of the World</h1>
+      <h1 id="race-title" data-race="title">Leader of the World</h1>
       <p id="headline" class="headline" aria-live="polite"></p>
     </div>
     <div class="stats">
@@ -89,7 +89,7 @@
     </div>
 
     <div class="card" id="run-card">
-      <h2>Run for leader</h2>
+      <h2>Run for <span data-race="lower">leader</span></h2>
       <p class="muted">Anyone from any nation can run. New candidates appear on the ballot once an admin approves them.</p>
       <form id="run-form" novalidate>
         <div class="field">

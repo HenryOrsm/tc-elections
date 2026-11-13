@@ -225,7 +225,7 @@
     });
   });
   $('clr-votes').addEventListener('click', function () {
-    if (confirm('Delete every admin test vote in the presidential race?')) act(sb.from('votes').delete().like('mc_username', 'admin_test_%'), 'Cleared the admin test votes.');
+    if (confirm('Delete every admin test vote in the ' + EL.race.lower + ' race?')) act(sb.from('votes').delete().like('mc_username', 'admin_test_%'), 'Cleared the admin test votes.');
   });
   $('clr-sen').addEventListener('click', function () {
     if (confirm('Delete every admin test vote in the senate race?')) act(sb.from('senate_votes').delete().like('mc_username', 'admin_test_%'), 'Cleared the senate admin test votes.');

@@ -105,5 +105,14 @@
     return { el: el, get: function () { set(num.value || count); return count; } };
   }
 
-  window.EL = { bulkPicker: bulkPicker, checkAdmin: checkAdmin, h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
+  // Names of the main race, set in settings.js. Elements with data-race="short|lower|title" get filled in.
+  var CFGR = window.ELECTION_CONFIG || {};
+  var race = { title: CFGR.raceTitle || 'Leader of the World', short: CFGR.raceShort || 'President', lower: CFGR.raceLower || 'president' };
+  function fillRace() {
+    var els = document.querySelectorAll('[data-race]');
+    for (var i = 0; i < els.length; i++) { var k = els[i].getAttribute('data-race'); if (race[k]) els[i].textContent = race[k]; }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillRace); else fillRace();
+
+  window.EL = { race: race, bulkPicker: bulkPicker, checkAdmin: checkAdmin, h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
 })();

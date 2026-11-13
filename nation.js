@@ -95,7 +95,7 @@
     var tie = lead && order.length > 1 && by[order[1]] === by[lead];
 
     var pres = $('pres'); clear(pres);
-    if (!ptotal) pres.appendChild(empty('Nobody from here has voted for president yet.'));
+    if (!ptotal) pres.appendChild(empty('Nobody from here has voted for ' + EL.race.lower + ' yet.'));
     else {
       var byParty = {}; order.forEach(function (id) { byParty[pc[id].party] = (byParty[pc[id].party] || 0) + by[id]; });
       pres.appendChild(h('h3', { 'class': 'sect', text: 'By party' }));
@@ -139,8 +139,8 @@
     $('st-sen').textContent = EL.num(stotal);
     $('st-share').textContent = worldTotal ? EL.pct(ptotal / worldTotal, 0) : '0%';
     var hl = $('n-headline');
-    if (!ptotal) hl.textContent = 'No presidential votes from this nation yet.';
-    else if (tie) hl.textContent = 'Dead heat for president here.';
+    if (!ptotal) hl.textContent = 'No ' + EL.race.lower + ' votes from this nation yet.';
+    else if (tie) hl.textContent = 'Dead heat for ' + EL.race.lower + ' here.';
     else hl.textContent = pc[lead].name + ' (' + party(pc[lead].party).name + ') leads here with ' + EL.pct(by[lead] / ptotal, 0) + '.';
     drawMini(lead && !tie ? EL.mix(party(pc[lead].party).color, 0.8) : null);
 
@@ -162,7 +162,7 @@
         h('span', { text: tag + ' · ' + party(c.party).name }), c.pitch ? h('span', { text: c.pitch }) : null));
     }
     if (!homeP.length && !sc.length) cb.appendChild(empty('Nobody from here is on a ballot yet.'));
-    homeP.forEach(function (c) { cb.appendChild(card(c, 'Running for President')); });
+    homeP.forEach(function (c) { cb.appendChild(card(c, 'Running for ' + EL.race.short)); });
     sc.forEach(function (x) { cb.appendChild(card(x.c, 'Running for Senate here')); });
 
     $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();

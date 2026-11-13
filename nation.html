@@ -17,7 +17,7 @@
 <header class="topbar">
   <div class="wrap topbar-in">
     <div class="brand"><span class="logo-tile"><img src="logo.png" alt="TC server logo" width="58" height="43"></span><span>World Election</span></div>
-    <nav class="nav" aria-label="Elections"><a href="index.html">President</a><a href="senate.html">Senate</a></nav>
+    <nav class="nav" aria-label="Elections"><a href="index.html"><span data-race="short">President</span></a><a href="senate.html">Senate</a></nav>
     <div class="live"><a href="index.html" style="color:#fff">Back to the map</a></div>
   </div>
 </header>
@@ -30,9 +30,9 @@
       <p id="n-headline" class="headline"></p>
     </div>
     <div class="stats">
-      <div class="stat"><b id="st-pres">0</b><span>President votes</span></div>
+      <div class="stat"><b id="st-pres">0</b><span><span data-race="short">President</span> votes</span></div>
       <div class="stat"><b id="st-sen">0</b><span>Senate votes</span></div>
-      <div class="stat"><b id="st-share">0%</b><span>Of all president votes</span></div>
+      <div class="stat"><b id="st-share">0%</b><span>Of all <span data-race="lower">president</span> votes</span></div>
     </div>
   </section>
 
@@ -49,7 +49,7 @@
 
   <section class="grid2">
     <div class="card">
-      <h2>President: how this nation voted</h2>
+      <h2><span data-race="short">President</span>: how this nation voted</h2>
       <div id="pres"></div>
     </div>
     <div class="card">

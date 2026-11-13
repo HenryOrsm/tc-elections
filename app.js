@@ -393,7 +393,7 @@
     $('vote-form').hidden = blocked;
     var box = $('vote-locked'); box.hidden = !blocked;
     box.textContent = closed ? 'Polls are closed. Thanks for voting.'
-      : (state.voteNote || 'You have already voted in the presidential election on this device. It is one vote per person. If something went wrong, ask an admin to change your vote.');
+      : (state.voteNote || 'You have already voted in the ' + EL.race.lower + ' election on this device. It is one vote per person. If something went wrong, ask an admin to change your vote.');
     $('admin-note').hidden = !isAdmin;
     if (!bulk.el.parentNode) $('v-submit').parentNode.insertBefore(bulk.el, $('v-submit'));
     bulk.el.hidden = !isAdmin;
