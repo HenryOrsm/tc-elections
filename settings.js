@@ -20,7 +20,7 @@
   c.parties = {
     "blue": { name: "The Toner Campaign", short: "Toner", color: "#1063DF" },
     "gold": { name: "Og for Aljanna", short: "Og", color: "#DDAA22" },
-    "red":  { name: "Literal Russian Communism", short: "Communism",  color: "#D32F2F" },
+    "red":  { name: "Aljanna Progressive Party", short: "Progressive", color: "#D32F2F" },
     "green": { name: "MAGA (Make Aljanna Great Again)", short: "MAGA", color: "#2E9E4F" }
   };
   // The main race. Change these three to rename it everywhere (set back for the presidential election).
