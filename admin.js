@@ -34,8 +34,12 @@
         sb.from('senate_votes').select('id,mc_username,nation,candidate_id,created_at').not('mc_username', 'like', 'admin_test_%').order('created_at', { ascending: false }).limit(500),
         sb.from('nation_info').select('*'),
         sb.from('votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%'),
-        sb.from('senate_votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%')
+        sb.from('senate_votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%'),
+        sb.from('parties').select('*').order('sort', { ascending: true }).order('created_at', { ascending: true })
       ]).then(function (res) {
+        partyRows = res[7].error ? null : res[7].data;
+        if (partyRows && partyRows.length) { var pm = {}; partyRows.forEach(function (r) { pm[r.id] = { name: r.name, short: r.short || undefined, color: r.color }; }); PARTIES = pm; }
+        renderParties(partyRows);
         if (res[0].error || res[1].error) { say('dash-msg', 'Could not load data.', true); return; }
         render(res[0].data, res[1].data);
         renderSenate(res[2].error ? null : res[2].data, res[3].error ? null : res[3].data);
@@ -47,11 +51,15 @@
   }
 
   var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' }, red: { name: 'Red Party', color: '#D32F2F' } };
+  var partyRows = null;
   function party(c) { return PARTIES[c.party] || PARTIES[Object.keys(PARTIES)[0]]; }
 
   function act(promise, okText) {
     return promise.then(function (r) {
-      if (r.error) { say('dash-msg', 'That did not work: ' + r.error.message, true); return; }
+      if (r.error) {
+        say('dash-msg', r.error.code === '23503' ? 'That party still has candidates. Remove or reassign them first.' : 'That did not work: ' + r.error.message, true);
+        return;
+      }
       say('dash-msg', okText, false);
       return load();
     });
@@ -194,6 +202,51 @@
       var who = byId[x.candidate_id] ? byId[x.candidate_id].name : 'Unknown';
       v.appendChild(voteRow('senate_votes', x, cands, who, false));
     });
+  }
+
+  function slug(name, taken) {
+    var base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20) || 'party', id = base, i = 2;
+    while (taken[id]) id = base.slice(0, 20) + '-' + (i++);
+    return id;
+  }
+
+  function renderParties(rows) {
+    var box = $('parties'); clear(box);
+    if (!rows) { box.appendChild(h('p', { 'class': 'muted', text: 'The parties table is not set up yet. Run add-parties-table.sql in Supabase first.' })); return; }
+    var taken = {}; rows.forEach(function (r) { taken[r.id] = true; });
+    rows.forEach(function (p) {
+      var col = p.color;
+      var swatch = h('span', { 'class': 'sw big', style: 'background:' + col });
+      var name = h('input', { type: 'text', maxlength: 60, value: p.name, 'aria-label': 'Party name' });
+      var short = h('input', { type: 'text', maxlength: 16, value: p.short || '', placeholder: 'Short name for map labels', 'aria-label': 'Short name' });
+      var picker = EL.colorPicker(col, function (c) { col = c; swatch.style.background = c; });
+      box.appendChild(h('div', { 'class': 'item', style: 'display:block' },
+        h('div', { 'class': 'who' }, h('b', null, swatch, p.name), name, short, picker),
+        h('div', { 'class': 'acts', style: 'margin-top:8px' },
+          h('button', { 'class': 'btn small', type: 'button', text: 'Save', onclick: function () {
+            if (name.value.trim().length < 2) { say('dash-msg', 'Give the party a name.', true); return; }
+            act(sb.from('parties').update({ name: name.value.trim(), short: short.value.trim() || null, color: col }).eq('id', p.id), name.value.trim() + ' saved.');
+          } }),
+          h('button', { 'class': 'btn small danger', type: 'button', text: 'Delete', onclick: function () {
+            if (confirm('Delete ' + p.name + '?')) act(sb.from('parties').delete().eq('id', p.id), p.name + ' was deleted.');
+          } }))));
+    });
+    // New party form
+    var used = rows.map(function (r) { return r.color.toLowerCase(); });
+    var ncol = EL.PARTY_COLORS.filter(function (c) { return used.indexOf(c.toLowerCase()) === -1; })[0] || EL.PARTY_COLORS[0];
+    var nswatch = h('span', { 'class': 'sw big', style: 'background:' + ncol });
+    var nname = h('input', { type: 'text', maxlength: 60, placeholder: 'New party name', 'aria-label': 'New party name' });
+    var nshort = h('input', { type: 'text', maxlength: 16, placeholder: 'Short name for map labels (optional)', 'aria-label': 'New party short name' });
+    var npicker = EL.colorPicker(ncol, function (c) { ncol = c; nswatch.style.background = c; });
+    box.appendChild(h('div', { 'class': 'item', style: 'display:block' },
+      h('div', { 'class': 'who' }, h('b', null, nswatch, 'Add a party'), nname, nshort, npicker),
+      h('div', { 'class': 'acts', style: 'margin-top:8px' },
+        h('button', { 'class': 'btn small', type: 'button', text: 'Add party', onclick: function () {
+          var nm = nname.value.trim();
+          if (nm.length < 2) { say('dash-msg', 'Give the new party a name.', true); return; }
+          var max = rows.reduce(function (a, r) { return Math.max(a, r.sort || 0); }, 0);
+          act(sb.from('parties').insert({ id: slug(nm, taken), name: nm, short: nshort.value.trim() || null, color: ncol, sort: max + 1 }), nm + ' added.');
+        } }))));
   }
 
   function renderNations(rows) {

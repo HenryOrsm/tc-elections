@@ -63,6 +63,11 @@
       <div id="sen-votes"></div>
     </section>
     <section class="card">
+      <h2>Parties</h2>
+      <p class="muted">Add, rename or recolour parties. A party can only be deleted when no candidate belongs to it.</p>
+      <div id="parties"></div>
+    </section>
+    <section class="card">
       <h2>Nation pages</h2>
       <p class="muted">Leader, capital and a short blurb shown on each nation's page. Leave a field empty to hide it.</p>
       <div id="nation-info"></div>
@@ -75,6 +80,6 @@
 <script src="js/config.js"></script>
 <script src="settings.js"></script>
 <script src="common.js"></script>
-<script src="admin.js"></script>
+<script>EL.boot('admin.js');</script>
 </body>
 </html>

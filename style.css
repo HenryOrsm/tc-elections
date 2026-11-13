@@ -182,3 +182,8 @@ a.chip:hover { background: #eef2f8; }
 .item .who b { display: flex; align-items: center; gap: 8px; }
 .bulk .chips button { min-width: 52px; }
 .bulk input[type=range] { accent-color: var(--navy, #0b2040); }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.swatches button { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; outline: 1px solid rgba(20,32,46,.25); cursor: pointer; }
+.swatches button[aria-checked=true] { border-color: #fff; outline: 3px solid #14202E; }
+.sw.big { width: 22px; height: 22px; }

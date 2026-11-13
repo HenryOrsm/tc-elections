@@ -114,5 +114,40 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillRace); else fillRace();
 
-  window.EL = { race: race, bulkPicker: bulkPicker, checkAdmin: checkAdmin, h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
+  // 20 preset party colours, spread around the colour wheel so neighbours on the map stay readable.
+  var PARTY_COLORS = ['#1063DF', '#DDAA22', '#D32F2F', '#2E9E4F', '#9C27B0', '#F57C00', '#00ACC1', '#D6458B', '#6D4C41', '#37474F',
+    '#8BC34A', '#29B6F6', '#283593', '#880E4F', '#9E9D24', '#5E35B1', '#00695C', '#FF7043', '#A1887F', '#4DB6AC'];
+
+  // Loads the party list from the database (when connected) BEFORE the page script runs.
+  // Falls back to the parties in settings.js if the table is missing, empty, or slow.
+  function boot(src) {
+    var C = window.ELECTION_CONFIG || {};
+    function go() { var el = document.createElement('script'); el.src = src; document.body.appendChild(el); }
+    var ok = C.supabaseUrl && C.supabaseAnonKey && String(C.supabaseUrl).indexOf('PASTE') === -1 && String(C.supabaseAnonKey).indexOf('PASTE') === -1 && window.fetch;
+    if (!ok) return go();
+    var req = fetch(String(C.supabaseUrl).replace(/\/$/, '') + '/rest/v1/parties?select=id,name,short,color&order=sort.asc,created_at.asc', { headers: { apikey: C.supabaseAnonKey } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) {
+        if (!rows || !rows.length) return;
+        var p = {};
+        rows.forEach(function (r) { p[r.id] = { name: r.name, short: r.short || undefined, color: r.color }; });
+        C.parties = p;
+      });
+    var timeout = new Promise(function (res) { setTimeout(res, 5000); });
+    Promise.race([req, timeout]).catch(function () {}).then(go);
+  }
+
+  // A row of colour swatches. onPick(hex) fires when one is chosen.
+  function colorPicker(current, onPick) {
+    var wrap = h('div', { 'class': 'swatches', role: 'radiogroup', 'aria-label': 'Party colour' }), btns = [];
+    function mark(c) { btns.forEach(function (b) { b.el.setAttribute('aria-checked', String(b.c.toLowerCase() === String(c).toLowerCase())); }); }
+    PARTY_COLORS.forEach(function (c) {
+      var b = h('button', { type: 'button', role: 'radio', 'aria-label': c, title: c, style: 'background:' + c, onclick: function () { mark(c); onPick(c); } });
+      btns.push({ c: c, el: b }); wrap.appendChild(b);
+    });
+    mark(current);
+    return wrap;
+  }
+
+  window.EL = { boot: boot, colorPicker: colorPicker, PARTY_COLORS: PARTY_COLORS, race: race, bulkPicker: bulkPicker, checkAdmin: checkAdmin, h: h, s: s, clear: clear, PALETTE: PALETTE, mix: mix, textOn: textOn, pct: pct, num: num };
 })();
