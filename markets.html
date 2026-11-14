@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markets | World Election</title>
+<meta name="description" content="Bet diamonds on what happens next in Aljanna.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Source+Serif+4:wght@600;700&amp;display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="demo-banner" class="banner" hidden>Demo mode: sample markets, nothing is saved. Add your Supabase keys in <code>js/config.js</code> to go live.</div>
+<div id="load-error" class="banner err" role="alert" hidden></div>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="brand"><span class="logo-tile"><img src="logo.png" alt="TC server logo" width="58" height="43"></span><span>World Election</span></div>
+    <nav class="nav" aria-label="Sections"><a href="index.html"><span data-race="short">President</span></a><a href="senate.html">Senate</a><a href="markets.html" aria-current="page">Markets</a></nav>
+    <div class="live"><span class="dot" aria-hidden="true"></span><span id="live-text">Live prices</span><button id="refresh" class="link-btn" type="button">Refresh</button></div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Prediction markets</p>
+      <h1>Diamond Markets</h1>
+      <p class="headline">Put diamonds on what happens next. The price is the crowd's odds.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="st-open">0</b><span>Open markets</span></div>
+      <div class="stat"><b id="st-bal">-</b><span>Your diamonds</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="wallet-card" style="margin-bottom: 24px">
+    <h2>Your wallet</h2>
+    <div id="wallet"></div>
+  </section>
+
+  <section class="card" style="margin-bottom: 24px">
+    <h2>How it works</h2>
+    <p class="muted" style="margin-bottom:0">Each market is a Yes or No question. A share pays <b>1 diamond</b> if you called it right and 0 if you didn't. A Yes share costing 0.62 means the crowd thinks it's about 62% likely. Buy shares you think are underpriced, then either hold them until an admin settles the market or sell them back early at the current price. Every market is priced on its own, so a group of related markets won't add up to exactly 100%.</p>
+  </section>
+
+  <div id="m-msg" class="msg" role="status" style="margin-bottom: 12px"></div>
+  <section id="sec-open"></section>
+  <section id="sec-wait"></section>
+  <section id="sec-done"></section>
+
+  <section class="card" id="propose-card" style="margin: 24px 0; max-width: 640px">
+    <h2>Suggest a market</h2>
+    <p class="muted">Ask any Yes or No question. It goes live once an admin approves it. You need a wallet to suggest one.</p>
+    <form id="prop-form" novalidate>
+      <div class="field">
+        <label for="p-q">Question</label>
+        <input id="p-q" type="text" maxlength="160" placeholder="Will Narellan and Cecilia merge by December?" required>
+      </div>
+      <div class="field">
+        <label for="p-d">Details <span class="muted">(optional)</span></label>
+        <textarea id="p-d" maxlength="500" placeholder="How should it be decided?"></textarea>
+      </div>
+      <div class="field">
+        <label for="p-c">Trading closes <span class="muted">(optional)</span></label>
+        <input id="p-c" type="datetime-local">
+      </div>
+      <button id="p-go" class="btn ghost" type="submit">Send for approval</button>
+      <div id="p-msg" class="msg" role="status"></div>
+    </form>
+  </section>
+</main>
+
+<footer class="wrap"><p>Diamonds on this page are tracked by the server admins. Prices update when anyone trades. <span id="updated"></span></p></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="settings.js"></script>
+<script src="common.js"></script>
+<script>EL.boot('markets.js');</script>
+</body>
+</html>

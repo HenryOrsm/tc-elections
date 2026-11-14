@@ -35,11 +35,16 @@
         sb.from('nation_info').select('*'),
         sb.from('votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%'),
         sb.from('senate_votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%'),
-        sb.from('parties').select('*').order('sort', { ascending: true }).order('created_at', { ascending: true })
+        sb.from('parties').select('*').order('sort', { ascending: true }).order('created_at', { ascending: true }),
+        sb.from('markets').select('*').order('created_at', { ascending: false }),
+        sb.from('wallets').select('username,display_name,balance').order('balance', { ascending: false }).limit(300),
+        sb.from('market_settings').select('*')
       ]).then(function (res) {
         partyRows = res[7].error ? null : res[7].data;
         if (partyRows && partyRows.length) { var pm = {}; partyRows.forEach(function (r) { pm[r.id] = { name: r.name, short: r.short || undefined, color: r.color }; }); PARTIES = pm; }
         renderParties(partyRows);
+        allCands = res[0].error ? [] : res[0].data;
+        renderMarketAdmin(res[8].error ? null : res[8].data, res[9].error ? [] : res[9].data, res[10].error ? [] : res[10].data);
         if (res[0].error || res[1].error) { say('dash-msg', 'Could not load data.', true); return; }
         render(res[0].data, res[1].data);
         renderSenate(res[2].error ? null : res[2].data, res[3].error ? null : res[3].data);
@@ -52,6 +57,7 @@
 
   var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' }, red: { name: 'Red Party', color: '#D32F2F' } };
   var partyRows = null;
+  var allCands = [];
   function party(c) { return PARTIES[c.party] || PARTIES[Object.keys(PARTIES)[0]]; }
 
   function act(promise, okText) {
@@ -201,6 +207,109 @@
     votes.forEach(function (x) {
       var who = byId[x.candidate_id] ? byId[x.candidate_id].name : 'Unknown';
       v.appendChild(voteRow('senate_votes', x, cands, who, false));
+    });
+  }
+
+  /* ---------- diamond markets ---------- */
+  function lmsrYes(m) { var qy = Number(m.q_yes), qn = Number(m.q_no), b = Number(m.b), mx = Math.max(qy, qn), ey = Math.exp((qy - mx) / b), en = Math.exp((qn - mx) / b); return ey / (ey + en); }
+  function actRpc(promise, okText) {
+    return promise.then(function (r) {
+      if (r.error) { say('dash-msg', 'That did not work: ' + r.error.message, true); return; }
+      if (r.data && r.data.ok === false) { say('dash-msg', r.data.error || 'That did not work.', true); return; }
+      say('dash-msg', okText, false);
+      return load();
+    });
+  }
+  function renderMarketAdmin(markets, wallets, settings) {
+    var tools = $('mk-tools'), pend = $('mk-pending'), live = $('mk-live'), wal = $('mk-wallets');
+    [tools, pend, live, wal].forEach(clear);
+    if (!markets) { tools.appendChild(h('p', { 'class': 'muted', text: 'The markets tables are not set up yet. Run add-markets.sql in Supabase first.' })); $('mk-pend-n').textContent = ''; return; }
+
+    // one-click election markets
+    var existing = {}; markets.forEach(function (m) { if (m.ref) existing[m.kind + ':' + m.ref] = true; });
+    var toMake = [];
+    allCands.filter(function (c) { return c.approved; }).forEach(function (c) {
+      if (!existing['candidate:' + c.id]) toMake.push({ question: 'Will ' + c.name + ' win the ' + EL.race.title + '?', kind: 'candidate', ref: c.id, status: 'open', description: 'Settles when the polls close.' });
+    });
+    Object.keys(PARTIES).forEach(function (k) {
+      if (!existing['senate:' + k]) toMake.push({ question: 'Will ' + PARTIES[k].name + ' win the most Senate seats?', kind: 'senate', ref: k, status: 'open', description: 'Settles on the final Senate seat count.' });
+    });
+    tools.appendChild(h('div', { 'class': 'acts', style: 'margin-bottom:12px' },
+      h('button', { 'class': 'btn small', type: 'button', text: toMake.length ? 'Create ' + toMake.length + ' election market' + (toMake.length === 1 ? '' : 's') : 'Election markets are up to date', disabled: toMake.length ? null : 'disabled',
+        onclick: function () { act(sb.from('markets').insert(toMake), 'Created ' + toMake.length + ' markets.'); } })));
+
+    // custom market
+    var cq = h('input', { type: 'text', maxlength: 160, placeholder: 'Question (a Yes or No)', 'aria-label': 'Market question' });
+    var cd = h('input', { type: 'text', maxlength: 500, placeholder: 'How it settles (optional)', 'aria-label': 'Market details' });
+    var cb = h('select', { 'aria-label': 'Liquidity' });
+    [['25', 'Twitchy (prices jump, low risk)'], ['50', 'Normal'], ['100', 'Steady'], ['250', 'Deep (prices barely move, costs the house more)']].forEach(function (o) { cb.appendChild(h('option', { value: o[0], text: o[1] })); });
+    cb.value = '50';
+    var cc = h('input', { type: 'datetime-local', 'aria-label': 'Trading closes' });
+    tools.appendChild(h('div', { 'class': 'item', style: 'display:block' },
+      h('div', { 'class': 'who' }, h('b', { text: 'New custom market' }), cq, cd, cb, h('span', { text: 'Trading closes (optional)' }), cc),
+      h('div', { 'class': 'acts', style: 'margin-top:8px' }, h('button', { 'class': 'btn small', type: 'button', text: 'Create market', onclick: function () {
+        if (cq.value.trim().length < 5) { say('dash-msg', 'Write the question out.', true); return; }
+        act(sb.from('markets').insert({ question: cq.value.trim(), description: cd.value.trim() || null, kind: 'custom', status: 'open', b: Number(cb.value), closes_at: cc.value ? new Date(cc.value).toISOString() : null }), 'Market created.');
+      } }))));
+
+    // starter diamonds
+    var starterRow = (settings || []).filter(function (r) { return r.key === 'starter_diamonds'; })[0];
+    var st = h('input', { type: 'number', min: 0, step: 1, value: starterRow ? starterRow.value : 100, 'aria-label': 'Starter diamonds', style: 'width:110px' });
+    tools.appendChild(h('div', { 'class': 'item' },
+      h('div', { 'class': 'who' }, h('b', { text: 'Free starter diamonds' }), h('span', { text: 'What a new wallet starts with. Set 0 to turn the freebie off.' })),
+      h('div', { 'class': 'acts' }, st, h('button', { 'class': 'btn small', type: 'button', text: 'Save', onclick: function () {
+        act(sb.from('market_settings').update({ value: Math.max(0, Number(st.value) || 0) }).eq('key', 'starter_diamonds'), 'Starter diamonds updated.');
+      } }))));
+
+    // proposals
+    var pending = markets.filter(function (m) { return m.status === 'pending'; });
+    $('mk-pend-n').textContent = '(' + pending.length + ')';
+    if (!pending.length) pend.appendChild(h('p', { 'class': 'muted', text: 'Nobody is waiting.' }));
+    pending.forEach(function (m) {
+      pend.appendChild(h('div', { 'class': 'item' },
+        h('div', { 'class': 'who' }, h('b', { text: m.question }), h('span', { text: 'From ' + (m.created_by || 'someone') + (m.description ? ' · ' + m.description : '') + (m.closes_at ? ' · closes ' + new Date(m.closes_at).toLocaleString() : '') })),
+        h('div', { 'class': 'acts' },
+          h('button', { 'class': 'btn small', type: 'button', text: 'Approve', onclick: function () { act(sb.from('markets').update({ status: 'open' }).eq('id', m.id), 'Market is live.'); } }),
+          h('button', { 'class': 'btn small danger', type: 'button', text: 'Reject', onclick: function () { if (confirm('Reject this suggestion?')) act(sb.from('markets').delete().eq('id', m.id), 'Rejected.'); } }))));
+    });
+
+    // live markets
+    var liveList = markets.filter(function (m) { return m.status === 'open' || m.status === 'closed'; });
+    if (!liveList.length) live.appendChild(h('p', { 'class': 'muted', text: 'No open markets.' }));
+    liveList.forEach(function (m) {
+      function settle(outcome, label) { if (confirm(label + ' for: ' + m.question + '\n\nThis pays everyone out and cannot be undone.')) actRpc(sb.rpc('admin_settle_market', { p_market: m.id, p_outcome: outcome }), 'Settled.'); }
+      live.appendChild(h('div', { 'class': 'item', style: 'display:block' },
+        h('div', { 'class': 'who' }, h('b', { text: m.question }), h('span', { text: (m.status === 'open' ? 'Open' : 'Trading closed') + ' · Yes at ' + Math.round(lmsrYes(m) * 100) + '%' })),
+        h('div', { 'class': 'acts', style: 'margin-top:8px;display:flex;gap:6px;flex-wrap:wrap' },
+          h('button', { 'class': 'btn small ghost', type: 'button', text: m.status === 'open' ? 'Close trading' : 'Reopen', onclick: function () { act(sb.from('markets').update({ status: m.status === 'open' ? 'closed' : 'open' }).eq('id', m.id), m.status === 'open' ? 'Trading closed.' : 'Reopened.'); } }),
+          h('button', { 'class': 'btn small', type: 'button', text: 'Settle Yes', onclick: function () { settle('yes', 'Settle YES'); } }),
+          h('button', { 'class': 'btn small', type: 'button', text: 'Settle No', onclick: function () { settle('no', 'Settle NO'); } }),
+          h('button', { 'class': 'btn small danger', type: 'button', text: 'Void (refund)', onclick: function () { settle('void', 'VOID and refund'); } }))));
+    });
+    var done = markets.filter(function (m) { return m.status === 'settled'; }).slice(0, 8);
+    done.forEach(function (m) { live.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: m.question }), h('span', { text: 'Settled: ' + m.outcome })))); });
+
+    // wallets
+    var wu = h('input', { type: 'text', placeholder: 'Minecraft username', 'aria-label': 'Wallet username', autocomplete: 'off' });
+    var wa = h('input', { type: 'number', step: 'any', placeholder: 'Diamonds (negative to take away)', 'aria-label': 'Amount' });
+    var wr = h('input', { type: 'text', maxlength: 80, placeholder: 'Note, e.g. deposited 10 real diamonds', 'aria-label': 'Note' });
+    wal.appendChild(h('div', { 'class': 'item', style: 'display:block' },
+      h('div', { 'class': 'who' }, h('b', { text: 'Add or remove diamonds' }), wu, wa, wr),
+      h('div', { 'class': 'acts', style: 'margin-top:8px' }, h('button', { 'class': 'btn small', type: 'button', text: 'Apply', onclick: function () {
+        var n = Number(wa.value); if (!wu.value.trim() || !n) { say('dash-msg', 'Enter a username and a non-zero amount.', true); return; }
+        actRpc(sb.rpc('admin_credit', { p_user: wu.value, p_amount: n, p_reason: wr.value }), (n > 0 ? 'Added ' : 'Removed ') + Math.abs(n) + ' diamonds.');
+      } }))));
+    var pu = h('input', { type: 'text', placeholder: 'Minecraft username', 'aria-label': 'Username to reset', autocomplete: 'off' });
+    var pp = h('input', { type: 'text', maxlength: 8, placeholder: 'New PIN (4 to 8 digits)', 'aria-label': 'New PIN', autocomplete: 'off' });
+    wal.appendChild(h('div', { 'class': 'item', style: 'display:block' },
+      h('div', { 'class': 'who' }, h('b', { text: 'Reset someone\'s PIN' }), pu, pp),
+      h('div', { 'class': 'acts', style: 'margin-top:8px' }, h('button', { 'class': 'btn small', type: 'button', text: 'Set PIN', onclick: function () {
+        actRpc(sb.rpc('admin_set_pin', { p_user: pu.value, p_pin: pp.value }), 'PIN changed.');
+      } }))));
+    if (!wallets.length) wal.appendChild(h('p', { 'class': 'muted', text: 'No wallets yet.' }));
+    wallets.forEach(function (w) {
+      wal.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: w.display_name }), h('span', { text: Number(w.balance).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' diamonds' })),
+        h('div', { 'class': 'acts' }, h('button', { 'class': 'btn small ghost', type: 'button', text: 'Use name', onclick: function () { wu.value = w.display_name; pu.value = w.display_name; wa.focus(); } }))));
     });
   }
 
