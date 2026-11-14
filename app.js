@@ -20,12 +20,12 @@
     var cands = [
       { id: 'd1', name: 'Candidate A', party: 'blue', home_nation: 'narellan', pitch: 'Sample candidate. Real ones show up once approved.' },
       { id: 'd2', name: 'Candidate B', party: 'gold', home_nation: 'seafaria', pitch: 'Another sample candidate.' },
-      { id: 'd3', name: 'Candidate C', party: 'blue', home_nation: 'eldonia', pitch: 'A third sample candidate.' }
+      { id: 'd3', name: 'Candidate C', party: 'blue', home_nation: 'corcelia', pitch: 'A third sample candidate.' }
     ];
     var seed = 7;
     function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
-    var lean = { maradon: [.62, .25, .13], goldleaf: [.3, .48, .22], dyonisia: [.54, .3, .16], seafaria: [.18, .71, .11],
-      narellan: [.83, .1, .07], cecilia: [.3, .52, .18], eldonia: [.25, .31, .44], 'island-a': [.58, .22, .2], 'island-b': [.05, .9, .05] };
+    var lean = { maradon: [.62, .25, .13], flumina: [.3, .48, .22], seafaria: [.18, .71, .11],
+      narellan: [.83, .1, .07], corcelia: [.3, .52, .18], athens: [.58, .22, .2] };
     var votes = [];
     Object.keys(lean).forEach(function (n) {
       var size = 18 + Math.floor(rnd() * 40);
@@ -167,8 +167,8 @@
 
   /* ---------- map ---------- */
   var refs = {};
-  var CALLOUTS = { 'island-a': [1010, 373], 'island-b': [1010, 247] };
-  var LABEL_DY = { dyonisia: 14 };
+  var CALLOUTS = { athens: [822, 316] };
+  var LABEL_DY = {};
 
   function buildMap() {
     var svg = $('map');

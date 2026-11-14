@@ -158,8 +158,8 @@
 
   /* ---------- map ---------- */
   var refs = {};
-  var CALLOUTS = { 'island-a': [1010, 373], 'island-b': [1010, 247] };
-  var LABEL_DY = { dyonisia: 14 };
+  var CALLOUTS = { athens: [822, 316] };
+  var LABEL_DY = {};
 
   function buildMap() {
     var svg = $('map'); clear(svg);

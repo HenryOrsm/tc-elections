@@ -7,14 +7,11 @@
   var c = window.ELECTION_CONFIG = window.ELECTION_CONFIG || {};
   c.nations = {
     "maradon": "Maradon",
-    "goldleaf": "Goldleaf",
-    "dyonisia": "Dyonisia",
+    "flumina": "Flumina",
     "seafaria": "Seafaria",
+    "corcelia": "Corcelia",
     "narellan": "Narellan",
-    "cecilia": "Cecilia",
-    "eldonia": "Eldonia",
-    "island-a": "Athens",
-    "island-b": "Grassisland",
+    "athens": "Athens",
     "igt-town": "IGT Town"
   };
   c.parties = {
@@ -31,8 +28,8 @@
   c.senateSeatsPerNation = 2;
   // Seats per nation. Any nation not listed here gets senateSeatsPerNation. 0 = no senators for now.
   c.senateSeats = {
-    "maradon": 2, "cecilia": 2, "narellan": 2,
-    "goldleaf": 0, "dyonisia": 0, "island-a": 0, "eldonia": 0, "island-b": 0,
+    "maradon": 2, "corcelia": 2, "narellan": 2,
+    "flumina": 0, "athens": 0,
     "seafaria": 0
   };
   // Greyed out on the senate map like IGT Town: no seats, no voting, no candidates.
