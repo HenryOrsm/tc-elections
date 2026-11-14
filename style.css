@@ -213,3 +213,4 @@ a.chip:hover { background: #eef2f8; }
 .spark { width: 100%; max-width: 360px; height: auto; background: #F6F8FB; border: 1px solid #E1E6EE; }
 .mkt-grid { align-items: start; }
 .trade input[type=number] { width: 100%; max-width: 260px; padding: 10px 12px; font: inherit; border: 1px solid #14202E; background: #fff; }
+.vol { margin: 0 0 6px; font-size: 13px; color: var(--muted, #5b6676); font-weight: 600; }

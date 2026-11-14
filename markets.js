@@ -42,7 +42,7 @@
     };
     api = {
       markets: function () {
-        return sb.from('markets').select('id,question,description,kind,status,outcome,b,q_yes,q_no,closes_at,created_at')
+        return sb.from('markets').select('id,question,description,kind,status,outcome,b,q_yes,q_no,volume,closes_at,created_at')
           .order('created_at', { ascending: false }).then(function (r) { if (r.error) throw r.error; return r.data; });
       },
       starter: function () {
@@ -60,8 +60,8 @@
     };
   } else {
     var D = { wallets: {}, hist: {}, markets: [
-      { id: 'd1', question: 'Will Candidate B win the Aljanna Mayor Election?', description: 'Settles when the polls close.', kind: 'candidate', status: 'open', outcome: null, b: 50, q_yes: 20, q_no: 0, closes_at: null, created_at: '2026-11-10' },
-      { id: 'd2', question: 'Will Narellan and Cecilia merge by December?', description: 'Counts if an official merge is announced.', kind: 'custom', status: 'open', outcome: null, b: 50, q_yes: 0, q_no: 12, closes_at: null, created_at: '2026-11-11' },
+      { id: 'd1', question: 'Will Candidate B win the Aljanna Mayor Election?', description: 'Settles when the polls close.', kind: 'candidate', status: 'open', outcome: null, b: 50, q_yes: 20, q_no: 0, volume: 412.5, closes_at: null, created_at: '2026-11-10' },
+      { id: 'd2', question: 'Will Narellan and Cecilia merge by December?', description: 'Counts if an official merge is announced.', kind: 'custom', status: 'open', outcome: null, b: 50, q_yes: 0, q_no: 12, volume: 96, closes_at: null, created_at: '2026-11-11' },
       { id: 'd3', question: 'Will Og for Aljanna win the most Senate seats?', description: null, kind: 'senate', status: 'closed', outcome: null, b: 50, q_yes: 5, q_no: 5, closes_at: null, created_at: '2026-11-09' },
       { id: 'd4', question: 'Will the server hit 50 players this week?', description: null, kind: 'custom', status: 'settled', outcome: 'yes', b: 50, q_yes: 30, q_no: 0, closes_at: null, created_at: '2026-11-01' }
     ] };
@@ -90,7 +90,7 @@
         if (spend > w.balance) return done({ ok: false, error: 'Not enough diamonds.' });
         var sh = buyShares(side, m, spend);
         if (side === 'yes') m.q_yes += sh; else m.q_no += sh;
-        w.balance -= spend; var ps = w.pos[id] = w.pos[id] || { yes: 0, no: 0 }; ps[side] += sh;
+        w.balance -= spend; m.volume = (m.volume || 0) + spend; var ps = w.pos[id] = w.pos[id] || { yes: 0, no: 0 }; ps[side] += sh;
         (D.hist[id] = D.hist[id] || []).push(priceYes(m.q_yes, m.q_no, m.b));
         return done({ ok: true, shares: sh, spent: spend, balance: w.balance });
       },
@@ -101,7 +101,7 @@
         if (sh < 0.0001) return done({ ok: false, error: 'You do not hold that many shares.' });
         var got = sellProceeds(side, m, sh);
         if (side === 'yes') m.q_yes -= sh; else m.q_no -= sh;
-        ps[side] -= sh; w.balance += got; (D.hist[id] = D.hist[id] || []).push(priceYes(m.q_yes, m.q_no, m.b));
+        ps[side] -= sh; w.balance += got; m.volume = (m.volume || 0) + got; (D.hist[id] = D.hist[id] || []).push(priceYes(m.q_yes, m.q_no, m.b));
         return done({ ok: true, shares: sh, received: got, balance: w.balance });
       },
       propose: function () { return done({ ok: true }); },
@@ -138,7 +138,7 @@
     });
   }
   function refreshMarkets() {
-    return api.markets().then(function (list) { markets = list.map(function (m) { m.q_yes = Number(m.q_yes); m.q_no = Number(m.q_no); m.b = Number(m.b); return m; }); })
+    return api.markets().then(function (list) { markets = list.map(function (m) { m.volume = Number(m.volume || 0); m.q_yes = Number(m.q_yes); m.q_no = Number(m.q_no); m.b = Number(m.b); return m; }); })
       .catch(function () {
         var e = $('load-error'); e.hidden = false;
         e.textContent = 'Markets could not load. Run add-markets.sql in Supabase if you have not yet.';
@@ -274,6 +274,7 @@
     card.appendChild(h('div', { 'class': 'odds' },
       h('div', { 'class': 'yes' }, h('b', { text: pctText(py) }), h('span', { text: 'Yes · ' + py.toFixed(2) + 'dia per share' })),
       h('div', { 'class': 'no' }, h('b', { text: pctText(1 - py) }), h('span', { text: 'No · ' + (1 - py).toFixed(2) + 'dia per share' }))));
+    card.appendChild(h('p', { 'class': 'vol', text: 'Volume: ' + money(m.volume || 0) }));
     card.appendChild(h('div', { 'class': 'oddsbar', 'aria-hidden': 'true' }, h('i', { style: 'width:' + (py * 100).toFixed(1) + '%' })));
     if (mine.yes > 0.0001 || mine.no > 0.0001) {
       var bits = [];
@@ -296,6 +297,7 @@
     var groups = { open: [], wait: [], done: [] };
     markets.forEach(function (m) { (m.status === 'settled' ? groups.done : isOpen(m) ? groups.open : groups.wait).push(m); });
     $('st-open').textContent = groups.open.length;
+    $('st-vol').textContent = money(markets.reduce(function (a, m) { return a + (m.volume || 0); }, 0));
     [['sec-open', 'Open markets', groups.open, 'No open markets right now.'], ['sec-wait', 'Waiting for a result', groups.wait, null], ['sec-done', 'Settled', groups.done, null]].forEach(function (g) {
       var sec = $(g[0]); clear(sec);
       if (!g[2].length && !g[3]) return;

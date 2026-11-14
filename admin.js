@@ -279,7 +279,7 @@
     liveList.forEach(function (m) {
       function settle(outcome, label) { if (confirm(label + ' for: ' + m.question + '\n\nThis pays everyone out and cannot be undone.')) actRpc(sb.rpc('admin_settle_market', { p_market: m.id, p_outcome: outcome }), 'Settled.'); }
       live.appendChild(h('div', { 'class': 'item', style: 'display:block' },
-        h('div', { 'class': 'who' }, h('b', { text: m.question }), h('span', { text: (m.status === 'open' ? 'Open' : 'Trading closed') + ' · Yes at ' + Math.round(lmsrYes(m) * 100) + '%' })),
+        h('div', { 'class': 'who' }, h('b', { text: m.question }), h('span', { text: (m.status === 'open' ? 'Open' : 'Trading closed') + ' · Yes at ' + Math.round(lmsrYes(m) * 100) + '% · Volume ' + Number(m.volume || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia' })),
         h('div', { 'class': 'acts', style: 'margin-top:8px;display:flex;gap:6px;flex-wrap:wrap' },
           h('button', { 'class': 'btn small ghost', type: 'button', text: m.status === 'open' ? 'Close trading' : 'Reopen', onclick: function () { act(sb.from('markets').update({ status: m.status === 'open' ? 'closed' : 'open' }).eq('id', m.id), m.status === 'open' ? 'Trading closed.' : 'Reopened.'); } }),
           h('button', { 'class': 'btn small', type: 'button', text: 'Settle Yes', onclick: function () { settle('yes', 'Settle YES'); } }),
