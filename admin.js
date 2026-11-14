@@ -308,7 +308,7 @@
       } }))));
     if (!wallets.length) wal.appendChild(h('p', { 'class': 'muted', text: 'No wallets yet.' }));
     wallets.forEach(function (w) {
-      wal.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: w.display_name }), h('span', { text: Number(w.balance).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' diamonds' })),
+      wal.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: w.display_name }), h('span', { text: Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia' })),
         h('div', { 'class': 'acts' }, h('button', { 'class': 'btn small ghost', type: 'button', text: 'Use name', onclick: function () { wu.value = w.display_name; pu.value = w.display_name; wa.focus(); } }))));
     });
   }

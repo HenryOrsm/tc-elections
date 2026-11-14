@@ -30,7 +30,8 @@
     svg.appendChild(s('polygon', { points: '8,1 11,6 8,15 5,6', fill: '#9BF0F0', opacity: .7 }));
     return svg;
   }
-  function dm(n) { return h('span', { 'class': 'dm' }, dia(), ' ' + fmt(n)); }
+  function money(n) { return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia'; }
+  function dm(n) { return h('span', { 'class': 'dm' }, dia(), ' ' + money(n)); }
 
   /* ---------- data layer: real (Supabase) or demo (in memory) ---------- */
   var api;
@@ -148,7 +149,7 @@
   /* ---------- wallet card ---------- */
   function renderWallet() {
     var box = $('wallet'); clear(box);
-    $('st-bal').textContent = wallet ? fmt(wallet.balance) : '-';
+    $('st-bal').textContent = wallet ? money(wallet.balance) : '-';
     if (wallet) {
       box.appendChild(h('p', { style: 'margin:0 0 10px' }, 'Signed in as ', h('b', { text: wallet.name }), '. Balance: ', h('b', null, dm(wallet.balance))));
       box.appendChild(h('button', { 'class': 'btn small ghost', type: 'button', text: 'Log out', onclick: function () { session = null; wallet = null; saveSession(null); renderAll(); } }));
@@ -172,7 +173,7 @@
     var form = h('form', { style: 'max-width:520px', novalidate: 'novalidate' },
       h('div', { 'class': 'field' }, h('label', { 'for': 'w-user', text: 'Minecraft username' }), user),
       h('div', { 'class': 'field' }, h('label', { 'for': 'w-pin', text: 'PIN' }), pin,
-        h('span', { 'class': 'hint', text: 'New here? Pick any PIN and press Create wallet' + (starter ? ' to get ' + fmt(starter) + ' free diamonds' : '') + '. You need the same PIN every time, so remember it. Admins can reset it.' })),
+        h('span', { 'class': 'hint', text: 'New here? Pick any PIN and press Create wallet' + (starter ? ' to get ' + money(starter) + ' free' : '') + '. You need the same PIN every time, so remember it. Admins can reset it.' })),
       h('div', { 'class': 'acts', style: 'display:flex;gap:8px;flex-wrap:wrap' },
         h('button', { 'class': 'btn', type: 'submit', text: 'Log in' }),
         h('button', { 'class': 'btn ghost', type: 'button', text: 'Create wallet', onclick: function () { go(function (c) { return api.register(c.user, c.pin); }); } })),
@@ -209,7 +210,7 @@
     var modeBtns = h('div', { 'class': 'seg' },
       h('button', { type: 'button', 'class': mode === 'buy' ? 'on' : '', text: 'Buy', onclick: function () { ui.mode = 'buy'; ui.amount = '10'; renderMarkets(); } }),
       h('button', { type: 'button', 'class': mode === 'sell' ? 'on' : '', text: 'Sell', onclick: function () { ui.mode = 'sell'; ui.amount = String(Math.floor(posOf(m.id)[ui.side] * 100) / 100 || ''); renderMarkets(); } }));
-    var input = h('input', { type: 'number', min: 0, step: 'any', value: ui.amount, 'aria-label': mode === 'buy' ? 'Diamonds to spend' : 'Shares to sell', inputmode: 'decimal' });
+    var input = h('input', { type: 'number', min: 0, step: 'any', value: ui.amount, 'aria-label': mode === 'buy' ? 'Diamonds to spend (dia)' : 'Shares to sell', inputmode: 'decimal' });
     var preview = h('div', { 'class': 'preview' });
     var msg = h('div', { 'class': 'msg', role: 'status' });
     var go = h('button', { 'class': 'btn', type: 'button' });
@@ -222,7 +223,7 @@
         if (!a) { preview.textContent = 'Enter how many diamonds to spend.'; return; }
         if (a * 1 > 1e6) { preview.textContent = 'That is too large.'; return; }
         var sh = buyShares(side, m, a);
-        preview.appendChild(h('span', null, 'You get about ', h('b', { text: fmt(sh) }), ' ' + side.toUpperCase() + ' shares (avg ' + fmt(a / sh, 3) + ' each). Pays ', dm(sh), ' if ' + (side === 'yes' ? 'Yes' : 'No') + ', a profit of ', dm(sh - a), '.'));
+        preview.appendChild(h('span', null, 'You get about ', h('b', { text: fmt(sh) }), ' ' + side.toUpperCase() + ' shares (avg ' + money(a / sh) + ' each). Pays ', dm(sh), ' if ' + (side === 'yes' ? 'Yes' : 'No') + ', a profit of ', dm(sh - a), '.'));
       } else {
         go.textContent = wallet ? 'Sell ' + (side === 'yes' ? 'Yes' : 'No') : 'Log in to trade';
         if (!a) { preview.textContent = hold[side] > 0 ? 'Enter how many shares to sell.' : 'You hold no ' + side.toUpperCase() + ' shares here.'; return; }
@@ -249,7 +250,7 @@
         go.disabled = false;
         if (!r.ok) { msg.textContent = r.error || 'That did not work.'; msg.className = 'msg err'; return; }
         delete hist[m.id];
-        say('m-msg', mode === 'buy' ? 'Bought ' + fmt(r.shares) + ' ' + side.toUpperCase() + ' shares for ' + fmt(r.spent) + ' diamonds.' : 'Sold ' + fmt(r.shares) + ' ' + side.toUpperCase() + ' shares for ' + fmt(r.received) + ' diamonds.', false);
+        say('m-msg', mode === 'buy' ? 'Bought ' + fmt(r.shares) + ' ' + side.toUpperCase() + ' shares for ' + money(r.spent) + '.' : 'Sold ' + fmt(r.shares) + ' ' + side.toUpperCase() + ' shares for ' + money(r.received) + '.', false);
         return refreshAll();
       });
     });
@@ -258,7 +259,7 @@
     if (hist[m.id]) chartBox.appendChild(chart(hist[m.id]));
     else api.history(m.id).then(function (v) { hist[m.id] = v; clear(chartBox); chartBox.appendChild(chart(v)); });
     box.appendChild(h('div', { 'class': 'trade-row' }, sideBtns, modeBtns));
-    box.appendChild(h('div', { 'class': 'field', style: 'margin:10px 0 6px' }, h('label', { text: mode === 'buy' ? 'Diamonds to spend' : 'Shares to sell' }), input));
+    box.appendChild(h('div', { 'class': 'field', style: 'margin:10px 0 6px' }, h('label', { text: mode === 'buy' ? 'Diamonds to spend (dia)' : 'Shares to sell' }), input));
     box.appendChild(quick); box.appendChild(preview); box.appendChild(go); box.appendChild(msg);
     box.appendChild(h('p', { 'class': 'muted', style: 'margin:12px 0 4px', text: 'Yes price over time' })); box.appendChild(chartBox);
     upd();
@@ -271,15 +272,15 @@
     card.appendChild(h('div', { 'class': 'mkt-head' }, h('h3', { text: m.question }), badge(m)));
     if (m.description) card.appendChild(h('p', { 'class': 'muted', style: 'margin:4px 0 10px', text: m.description }));
     card.appendChild(h('div', { 'class': 'odds' },
-      h('div', { 'class': 'yes' }, h('b', { text: pctText(py) }), h('span', { text: 'Yes · ' + py.toFixed(2) + ' per share' })),
-      h('div', { 'class': 'no' }, h('b', { text: pctText(1 - py) }), h('span', { text: 'No · ' + (1 - py).toFixed(2) + ' per share' }))));
+      h('div', { 'class': 'yes' }, h('b', { text: pctText(py) }), h('span', { text: 'Yes · ' + py.toFixed(2) + 'dia per share' })),
+      h('div', { 'class': 'no' }, h('b', { text: pctText(1 - py) }), h('span', { text: 'No · ' + (1 - py).toFixed(2) + 'dia per share' }))));
     card.appendChild(h('div', { 'class': 'oddsbar', 'aria-hidden': 'true' }, h('i', { style: 'width:' + (py * 100).toFixed(1) + '%' })));
     if (mine.yes > 0.0001 || mine.no > 0.0001) {
       var bits = [];
       if (mine.yes > 0.0001) bits.push(fmt(mine.yes) + ' Yes');
       if (mine.no > 0.0001) bits.push(fmt(mine.no) + ' No');
       var line = 'You hold ' + bits.join(' and ') + '.';
-      if (m.status === 'settled' && m.outcome && m.outcome !== 'void') line += ' ' + ((m.outcome === 'yes' ? mine.yes : mine.no) > 0.0001 ? 'Paid out ' + fmt(m.outcome === 'yes' ? mine.yes : mine.no) + ' diamonds.' : 'No payout.');
+      if (m.status === 'settled' && m.outcome && m.outcome !== 'void') line += ' ' + ((m.outcome === 'yes' ? mine.yes : mine.no) > 0.0001 ? 'Paid out ' + money(m.outcome === 'yes' ? mine.yes : mine.no) + '.' : 'No payout.');
       card.appendChild(h('p', { 'class': 'mine', text: line }));
     }
     if (open) {
