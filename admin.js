@@ -43,6 +43,7 @@
         partyRows = res[7].error ? null : res[7].data;
         if (partyRows && partyRows.length) { var pm = {}; partyRows.forEach(function (r) { pm[r.id] = { name: r.name, short: r.short || undefined, color: r.color }; }); PARTIES = pm; }
         renderParties(partyRows);
+        renderArchiveAdmin();
         allCands = res[0].error ? [] : res[0].data;
         renderMarketAdmin(res[8].error ? null : res[8].data, res[9].error ? [] : res[9].data, res[10].error ? [] : res[10].data);
         if (res[0].error || res[1].error) { say('dash-msg', 'Could not load data.', true); return; }
@@ -375,6 +376,40 @@
             act(sb.from('nation_info').upsert({ nation: n, leader: leader.value.trim() || null, capital: capital.value.trim() || null, blurb: blurb.value.trim() || null, updated_at: new Date().toISOString() }), nationName(n) + ' saved.');
           } }))));
     });
+  }
+
+
+  /* ---------- archive and reset ---------- */
+  function renderArchiveAdmin() {
+    var box = $('archive-tools'); clear(box);
+    var title = h('input', { type: 'text', placeholder: 'e.g. Aljanna Mayor Election, November 2026', maxlength: 120 });
+    box.appendChild(h('div', { 'class': 'field' }, h('label', { text: 'Archive title' }), title));
+    box.appendChild(h('button', { 'class': 'btn small', type: 'button', text: 'Archive this election', onclick: function () {
+      var t = title.value.trim(); if (!t) { say('dash-msg', 'Give the archive a title first.', true); return; }
+      if (!confirm('Archive the current election as "' + t + '"? Nothing is deleted yet.')) return;
+      var meta = { race: { title: EL.race.title, short: EL.race.short, lower: EL.race.lower }, nations: CFG.nations, seats: CFG.senateSeats, excluded: CFG.senateExcluded };
+      actRpc(sb.rpc('admin_archive_election', { p_title: t, p_meta: meta }), 'Archived. You can see it on the Archive page.');
+    } }));
+    var list = h('div', { style: 'margin:16px 0' }); box.appendChild(list);
+    sb.from('archives').select('id,title,created_at').order('created_at', { ascending: false }).then(function (r) {
+      if (r.error) { list.appendChild(h('p', { 'class': 'muted', text: 'Archives are not set up yet. Run add-archive.sql in Supabase.' })); return; }
+      if (!r.data.length) list.appendChild(h('p', { 'class': 'muted', text: 'No archives yet.' }));
+      r.data.forEach(function (a) {
+        list.appendChild(h('div', { 'class': 'row-head', style: 'margin:6px 0' }, h('span', null, h('b', { text: a.title }), ' ' + new Date(a.created_at).toLocaleDateString()),
+          h('button', { 'class': 'btn small ghost', type: 'button', text: 'Delete', onclick: function () { if (confirm('Delete the archive "' + a.title + '" for good?')) act(sb.from('archives').delete().eq('id', a.id), 'Archive deleted.'); } })));
+      });
+    });
+    box.appendChild(h('h3', { text: 'Start next election', style: 'margin-top:20px' }));
+    box.appendChild(h('p', { 'class': 'muted', text: 'Wipes all candidates and votes (both races). Diamond wallets are kept.' }));
+    var cp = h('input', { type: 'checkbox', checked: true }), cm = h('input', { type: 'checkbox', checked: true });
+    box.appendChild(h('label', { style: 'display:block;margin:6px 0' }, cp, ' Also delete all parties (blank slate)'));
+    box.appendChild(h('label', { style: 'display:block;margin:6px 0' }, cm, ' Also delete the old candidate/senate markets'));
+    var conf = h('input', { type: 'text', placeholder: 'Type RESET to confirm' });
+    box.appendChild(h('div', { 'class': 'field' }, conf));
+    box.appendChild(h('button', { 'class': 'btn small danger', type: 'button', text: 'Reset for next election', onclick: function () {
+      if (conf.value.trim() !== 'RESET') { say('dash-msg', 'Type RESET in the box first.', true); return; }
+      actRpc(sb.rpc('admin_reset_election', { p_parties: cp.checked, p_markets: cm.checked }), 'Reset done. The live site is blank for the next election.');
+    } }));
   }
 
   $('login-form').addEventListener('submit', function (e) {

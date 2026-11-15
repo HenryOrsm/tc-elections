@@ -214,3 +214,19 @@ a.chip:hover { background: #eef2f8; }
 .mkt-grid { align-items: start; }
 .trade input[type=number] { width: 100%; max-width: 260px; padding: 10px 12px; font: inherit; border: 1px solid #14202E; background: #fff; }
 .vol { margin: 0 0 6px; font-size: 13px; color: var(--muted, #5b6676); font-weight: 600; }
+
+/* ---- tabs, archive, predict ---- */
+.tabs { display: flex; gap: 0; margin: 0 0 20px; border-bottom: 2px solid #14202E; }
+.tabs button { border: 0; background: transparent; padding: 10px 20px; font: inherit; font-weight: 700; cursor: pointer; color: #14202E; min-height: 44px; }
+.tabs button.on { background: #14202E; color: #fff; }
+a.arch { text-decoration: none; color: inherit; display: block; }
+a.arch:hover { box-shadow: 0 4px 14px rgba(20, 32, 46, .15); }
+a.arch h3 { margin: 4px 0 8px; }
+.nav { flex-wrap: wrap; }
+.shr { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin: 8px 0; align-items: center; }
+.shr input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: #14202E; }
+.shr .pv { font-weight: 700; }
+.panel input[type=range] { width: 100%; accent-color: #14202E; }
+.weights { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 16px; margin: 12px 0; }
+.wrow { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+details.card summary { cursor: pointer; }

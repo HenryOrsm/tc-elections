@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archive | World Election</title>
+<meta name="description" content="Results from past elections.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Source+Serif+4:wght@600;700&amp;display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="demo-banner" class="banner" hidden>Demo mode: this is a sample archive. Add your Supabase keys in <code>js/config.js</code> to go live.</div>
+<div id="load-error" class="banner err" role="alert" hidden></div>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="brand"><span class="logo-tile"><img src="logo.png" alt="TC server logo" width="58" height="43"></span><span>World Election</span></div>
+    <nav class="nav" aria-label="Sections"><a href="index.html"><span data-race="short">President</span></a><a href="senate.html">Senate</a><a href="markets.html">Markets</a><a href="predict.html">Predict</a><a href="archive.html" aria-current="page">Archive</a></nav>
+    <div class="live"><a href="index.html" style="color:#fff">Live election</a></div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section id="list-view">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Archive</p>
+        <h1>Past elections</h1>
+        <p class="headline">Every finished election, kept exactly as it ended.</p>
+      </div>
+    </section>
+    <div id="list" class="mkt-grid"></div>
+  </section>
+
+  <section id="view" hidden>
+    <section class="hero">
+      <div>
+        <p class="eyebrow" id="v-date"></p>
+        <h1 id="v-title">Election</h1>
+        <p id="v-headline" class="headline"></p>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="st-votes">0</b><span id="st-votes-l">Votes</span></div>
+        <div class="stat"><b id="st-nations">0</b><span>Nations reporting</span></div>
+      </div>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Which race">
+      <button id="tab-pres" role="tab" type="button" class="on" aria-selected="true"></button>
+      <button id="tab-sen" role="tab" type="button" aria-selected="false">Senate</button>
+    </div>
+
+    <section id="pane-pres">
+      <section class="grid2">
+        <div class="card">
+          <h2 id="map-h">Results by nation</h2>
+          <div id="map-wrap" class="map-wrap"><svg id="map" role="group" aria-label="Map of results by nation"></svg></div>
+          <div id="legend" class="legend"></div>
+        </div>
+        <aside id="panel" class="card panel" aria-live="polite"></aside>
+      </section>
+      <section class="card" style="margin-bottom: 24px"><h2>Final result</h2><div id="totals" class="rows"></div></section>
+      <section class="card" style="margin-bottom: 24px"><h2>Nation by nation</h2>
+        <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th scope="col">Nation</th><th scope="col">Winner</th><th scope="col" class="n">Share</th><th scope="col" class="n">Votes</th></tr></thead><tbody id="nation-rows"></tbody></table></div>
+      </section>
+    </section>
+
+    <section id="pane-sen" hidden>
+      <section class="card" style="margin-bottom: 24px">
+        <h2>Who controlled the Senate?</h2>
+        <p id="sen-sub" class="muted"></p>
+        <div class="seatwrap"><div id="seatbar" class="seatbar" role="img" aria-label="Seats won by each party"></div><div id="maj" class="maj" hidden></div></div>
+        <div id="seatlist" class="seatlist"></div>
+      </section>
+      <section class="card" style="margin-bottom: 24px">
+        <h2>Seats by nation</h2>
+        <div id="smap-wrap" class="map-wrap"><svg id="smap" role="group" aria-label="Map of Senate seats by nation"></svg></div>
+        <div id="slegend" class="legend"></div>
+      </section>
+      <section class="card" style="margin-bottom: 24px"><h2>Senators nation by nation</h2>
+        <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th scope="col">Nation</th><th scope="col">Senators</th><th scope="col" class="n">Votes</th></tr></thead><tbody id="sen-rows"></tbody></table></div>
+      </section>
+    </section>
+
+    <p><a class="btn ghost" href="archive.html">All archived elections</a></p>
+  </section>
+</main>
+
+<footer class="wrap"><p>Archived results never change.</p></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="settings.js"></script>
+<script src="map-data.js"></script>
+<script src="common.js"></script>
+<script src="mapkit.js"></script>
+<script>EL.boot('archive.js');</script>
+</body>
+</html>

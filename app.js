@@ -112,6 +112,14 @@
   // One vote per person: after voting, this browser is locked out of the form. Admins are exempt.
   var LOCK_KEY = 'voted-president';
   function getLock() { try { return localStorage.getItem(LOCK_KEY); } catch (e) { return null; } }
+  function clearLock() { try { localStorage.removeItem(LOCK_KEY); } catch (e) {} }
+  // If an admin removed this person's vote, lift the lock so they can vote again.
+  function verifyLock() {
+    var who = getLock(); if (!who || !sb) return;
+    sb.rpc('has_voted', { p_race: 'president', p_name: who }).then(function (r) {
+      if (!r.error && r.data === false) { clearLock(); renderAll(); }
+    }, function () {});
+  }
   function setLock(v) { try { localStorage.setItem(LOCK_KEY, v); } catch (e) { /* private mode: no lock */ } }
 
   var PARTIES = CFG.parties || { blue: { name: 'Blue Party', color: '#1063DF' }, gold: { name: 'Gold Party', color: '#DDAA22' } };
@@ -525,6 +533,6 @@
   refresh();
   // Signed in as an admin on admin.html? Then this page lets you vote unlimited times to test.
   if (demo) { isAdmin = location.hash === '#admin'; renderAll(); }
-  else EL.checkAdmin(sb).then(function (ok) { isAdmin = ok; renderAll(); });
+  else { EL.checkAdmin(sb).then(function (ok) { isAdmin = ok; renderAll(); }); verifyLock(); }
   setInterval(function () { if (!document.hidden) refresh(); }, Math.max(5, CFG.refreshSeconds || 20) * 1000);
 })();
