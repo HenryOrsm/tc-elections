@@ -16,7 +16,9 @@
   var SEN_NATIONS = NATIONS.filter(function (n) { return seatsOf(n) > 0; });
   var SEATS_TOTAL = SEN_NATIONS.reduce(function (a, n) { return a + seatsOf(n); }, 0);
 
-  var TIERS = [{ max: 5, name: 'Tilt', t: 0.35 }, { max: 15, name: 'Lean', t: 0.55 }, { max: 30, name: 'Likely', t: 0.78 }, { max: 101, name: 'Safe', t: 1 }];
+  var TIERS = [{ max: 8, name: 'Tilt', t: 0.35 }, { max: 25, name: 'Lean', t: 0.55 }, { max: 40, name: 'Likely', t: 0.78 }, { max: 101, name: 'Safe', t: 1 }];
+  var CLICK_MARGINS = [45, 15]; // click order per candidate: Safe, then Lean
+  var DEFAULT_POP = { maradon: 22, corcelia: 8, narellan: 6, seafaria: 19, athens: 3, flumina: 3 };
   function tier(m) { for (var i = 0; i < TIERS.length; i++) if (m < TIERS[i].max) return TIERS[i]; return TIERS[3]; }
 
   /* ---------- state ---------- */
@@ -52,7 +54,7 @@
       });
     });
   }
-  function resetWeights() { NATIONS.forEach(function (n) { weights[n] = defaultWeights[n] || 0; }); var any = NATIONS.some(function (n) { return weights[n] > 0; }); if (!any) NATIONS.forEach(function (n) { weights[n] = 1000; }); }
+  function resetWeights() { NATIONS.forEach(function (n) { weights[n] = DEFAULT_POP[n] !== undefined ? DEFAULT_POP[n] : (defaultWeights[n] || 0); }); var any = NATIONS.some(function (n) { return weights[n] > 0; }); if (!any) NATIONS.forEach(function (n) { weights[n] = 1000; }); }
 
   /* ---------- nation maths ---------- */
   function sorted(sh) { return Object.keys(sh).sort(function (a, b) { return sh[b] - sh[a]; }); }
@@ -96,11 +98,16 @@
 
   /* ---------- president tab ---------- */
   function cycleP(n) {
-    var cur = pstate[n], idx = -1;
-    if (cur) { var l = leadInfo(cur); idx = people.map(function (p) { return p.id; }).indexOf(l.id); }
-    var next = idx + 1;
-    if (next >= people.length) { delete pstate[n]; }
-    else pstate[n] = makeShares(people[next].id, cur ? Math.max(leadInfo(cur).margin, 10) : 10);
+    // order: Safe A, Lean A, Safe B, Lean B, ..., blank
+    var cur = pstate[n], step = -1, K = CLICK_MARGINS.length;
+    if (cur) {
+      var l = leadInfo(cur), ci = people.map(function (p) { return p.id; }).indexOf(l.id);
+      var ti = l.margin >= (CLICK_MARGINS[0] + CLICK_MARGINS[1]) / 2 ? 0 : 1;
+      step = ci * K + ti;
+    }
+    step++;
+    if (step >= people.length * K) delete pstate[n];
+    else pstate[n] = makeShares(people[Math.floor(step / K)].id, CLICK_MARGINS[step % K]);
     selP = n; renderP();
   }
   function renderP() {
@@ -128,14 +135,14 @@
   function renderPanelP() {
     var panel = $('panel'); clear(panel);
     var n = selP;
-    if (!n) { panel.appendChild(h('h2', { text: 'Pick a nation' })); panel.appendChild(h('p', { 'class': 'muted', text: 'Click a nation to call it. Keep clicking to cycle through the candidates, then back to blank. Then drag its margin here.' })); return; }
+    if (!n) { panel.appendChild(h('h2', { text: 'Pick a nation' })); panel.appendChild(h('p', { 'class': 'muted', text: 'Click a nation: Safe then Lean for each candidate in turn, then blank. Then fine-tune its margin here.' })); return; }
     panel.appendChild(h('h2', { text: nName(n) }));
     var sh = pstate[n];
     if (!sh) { panel.appendChild(h('p', { 'class': 'muted', text: 'Not called yet. Click the nation to give it to the first candidate.' })); return; }
     var l = leadInfo(sh);
     var p0 = people.filter(function (x) { return x.id === l.id; })[0];
     panel.appendChild(h('p', null, h('span', { 'class': 'sw', style: 'background:' + p0.color }), h('b', { text: l.tie ? 'Tossup' : p0.name + ': ' + tier(l.margin).name + ' by ' + l.margin.toFixed(1) + ' points' })));
-    var mr = h('input', { type: 'range', min: 0, max: 60, step: 0.5, value: Math.min(60, l.margin), 'aria-label': 'Winning margin in points' });
+    var mr = h('input', { type: 'range', min: 0, max: 100, step: 0.5, value: l.margin, 'aria-label': 'Winning margin in points' });
     mr.addEventListener('input', function () { setMargin(sh, Number(mr.value)); paintP(n); refreshTotalsOnly(); updateSliders(); });
     panel.appendChild(h('div', { 'class': 'field' }, h('label', { text: 'Margin (lead over second place)' }), mr));
     var sliders = {};
@@ -147,7 +154,7 @@
       r.addEventListener('input', function () { setShare(sh, p.id, Number(r.value)); paintP(n); refreshTotalsOnly(); updateSliders(r); });
       panel.appendChild(h('div', { 'class': 'shr' }, h('span', null, h('span', { 'class': 'sw', style: 'background:' + p.color }), p.name), out, r));
     });
-    function updateSliders(skip) { Object.keys(sliders).forEach(function (id) { sliders[id].out.textContent = sh[id].toFixed(1) + '%'; if (sliders[id].r !== skip) sliders[id].r.value = sh[id]; }); var ll = leadInfo(sh); if (mr !== document.activeElement) mr.value = Math.min(60, ll.margin); }
+    function updateSliders(skip) { Object.keys(sliders).forEach(function (id) { sliders[id].out.textContent = sh[id].toFixed(1) + '%'; if (sliders[id].r !== skip) sliders[id].r.value = sh[id]; }); var ll = leadInfo(sh); if (mr !== document.activeElement) mr.value = ll.margin; }
     panel.appendChild(h('button', { 'class': 'btn small ghost', type: 'button', text: 'Clear this nation', onclick: function () { delete pstate[n]; renderP(); } }));
   }
   function refreshTotalsOnly() {
@@ -226,7 +233,7 @@
   function renderWeights() {
     var box = $('weights'); clear(box);
     NATIONS.forEach(function (n) {
-      var inp = h('input', { type: 'number', min: 0, step: 1, value: Math.round(weights[n]), 'aria-label': nName(n) + ' turnout' });
+      var inp = h('input', { type: 'number', min: 0, step: 1, value: Math.round(weights[n]), 'aria-label': nName(n) + ' population' });
       inp.addEventListener('input', function () { weights[n] = Math.max(0, Number(inp.value) || 0); refreshTotalsOnly(); });
       box.appendChild(h('label', { 'class': 'wrow' }, h('span', { text: nName(n) }), inp));
     });
@@ -255,11 +262,11 @@
   load().then(function () {
     resetWeights();
     $('pres-h').textContent = 'Who wins the ' + raceTitle + '?';
-    $('pres-hint').textContent = 'Click a nation to cycle through ' + people.length + ' options. Shade shows the margin: Tilt, Lean, Likely, Safe.';
+    $('pres-hint').textContent = 'Each click steps Safe, Lean for one candidate, then the next. Shade shows the margin.';
     pmap = MK.create($('map'), { fixed: function (id) { return NATIONS.indexOf(id) === -1; }, onClick: function (id) { cycleP(id); }, tip: function (id) { var sh = pstate[id]; if (!sh) return nName(id) + ': not called'; var l = leadInfo(sh); var p = people.filter(function (x) { return x.id === l.id; })[0]; return nName(id) + ': ' + (l.tie ? 'tossup' : p.name + ' by ' + l.margin.toFixed(1)); } });
     smap = MK.create($('smap'), { fixed: function (id) { return SEN_NATIONS.indexOf(id) === -1; }, onClick: function (id) { cycleS(id); }, tip: function (id) { var a = sstate[id]; return nName(id) + ': ' + (a ? a.map(function (p) { return p ? PARTIES[p].name : 'undecided'; }).join(', ') : 'not called'); } });
     var lg = $('legend'); clear(lg);
-    TIERS.forEach(function (t) { lg.appendChild(h('div', null, h('span', { 'class': 'sw', style: 'background:' + EL.mix('#14202E', t.t) }), t.name + (t.max < 100 ? ' (under ' + t.max + ')' : ' (30+)'))); });
+    TIERS.forEach(function (t) { lg.appendChild(h('div', null, h('span', { 'class': 'sw', style: 'background:' + EL.mix('#14202E', t.t) }), t.name + (t.max < 100 ? ' (under ' + t.max + ')' : ' (40+)'))); });
     var slg = $('slegend'); clear(slg);
     PARTY_IDS.forEach(function (p) { slg.appendChild(h('div', null, h('span', { 'class': 'sw', style: 'background:' + PARTIES[p].color }), PARTIES[p].name)); });
     renderWeights();
