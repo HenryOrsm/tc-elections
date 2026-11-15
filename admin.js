@@ -308,8 +308,16 @@
         actRpc(sb.rpc('admin_set_pin', { p_user: pu.value, p_pin: pp.value }), 'PIN changed.');
       } }))));
     if (!wallets.length) wal.appendChild(h('p', { 'class': 'muted', text: 'No wallets yet.' }));
+    var supply = h('p', { 'class': 'muted', text: 'Total in circulation: loading...' }); wal.appendChild(supply);
+    var shown = [];
+    sb.rpc('market_supply').then(function (r) {
+      if (r.error || !r.data) { supply.textContent = 'Run add-diamond-supply.sql in Supabase to see the total.'; return; }
+      var tot = Number(r.data.total); supply.textContent = 'Total in circulation: ' + tot.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia across ' + r.data.wallets + ' wallets.';
+      shown.forEach(function (x) { x.el.textContent = (tot > 0 ? Number(x.w.balance) / tot * 100 : 0).toFixed(2) + '% of all'; });
+    });
     wallets.forEach(function (w) {
-      wal.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: w.display_name }), h('span', { text: Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia' })),
+      var pct = h('span', { 'class': 'muted', text: '' }); shown.push({ w: w, el: pct });
+      wal.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: w.display_name }), h('span', { text: Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia' }), pct),
         h('div', { 'class': 'acts' }, h('button', { 'class': 'btn small ghost', type: 'button', text: 'Use name', onclick: function () { wu.value = w.display_name; pu.value = w.display_name; wa.focus(); } }))));
     });
   }

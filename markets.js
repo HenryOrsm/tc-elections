@@ -54,6 +54,7 @@
       buy: function (u, p, id, side, spend) { return rpc('market_buy', { p_user: u, p_pin: p, p_market: id, p_side: side, p_spend: spend }); },
       sell: function (u, p, id, side, sh) { return rpc('market_sell', { p_user: u, p_pin: p, p_market: id, p_side: side, p_shares: sh }); },
       propose: function (u, p, q, d, c) { return rpc('market_propose', { p_user: u, p_pin: p, p_question: q, p_description: d, p_closes_at: c }); },
+      supply: function () { return sb.rpc('market_supply').then(function (r) { return r.error || !r.data ? null : Number(r.data.total); }, function () { return null; }); },
       history: function (id) {
         return sb.rpc('market_history', { p_market: id }).then(function (r) { return r.error ? [] : r.data.map(function (x) { return Number(x.price_yes); }); }, function () { return []; });
       }
@@ -66,6 +67,7 @@
       { id: 'd4', question: 'Will the server hit 50 players this week?', description: null, kind: 'custom', status: 'settled', outcome: 'yes', b: 50, q_yes: 30, q_no: 0, closes_at: null, created_at: '2026-11-01' }
     ] };
     var done = function (v) { return Promise.resolve(v); };
+    D.supplyFn = function () { var t = 0; Object.keys(D.wallets).forEach(function (k) { t += D.wallets[k].balance; }); return done(t); };
     var W = function (u, p) { var w = D.wallets[u.toLowerCase().trim()]; return w && w.pin === p ? w : null; };
     var findM = function (id) { return D.markets.filter(function (m) { return m.id === id; })[0]; };
     api = {
@@ -105,6 +107,7 @@
         return done({ ok: true, shares: sh, received: got, balance: w.balance });
       },
       propose: function () { return done({ ok: true }); },
+      supply: function () { return D.supplyFn(); },
       history: function (id) { return done((D.hist[id] || []).slice()); }
     };
   }
@@ -298,6 +301,7 @@
     markets.forEach(function (m) { (m.status === 'settled' ? groups.done : isOpen(m) ? groups.open : groups.wait).push(m); });
     $('st-open').textContent = groups.open.length;
     $('st-vol').textContent = money(markets.reduce(function (a, m) { return a + (m.volume || 0); }, 0));
+    api.supply().then(function (t) { $('st-sup').textContent = t === null ? '-' : money(t); });
     [['sec-open', 'Open markets', groups.open, 'No open markets right now.'], ['sec-wait', 'Waiting for a result', groups.wait, null], ['sec-done', 'Settled', groups.done, null]].forEach(function (g) {
       var sec = $(g[0]); clear(sec);
       if (!g[2].length && !g[3]) return;
