@@ -309,6 +309,16 @@
       } }))));
     if (!wallets.length) wal.appendChild(h('p', { 'class': 'muted', text: 'No wallets yet.' }));
     var supply = h('p', { 'class': 'muted', text: 'Total in circulation: loading...' }); wal.appendChild(supply);
+    var bankBox = h('div', { 'class': 'item', style: 'display:block' }); wal.appendChild(bankBox);
+    sb.rpc('bank_info').then(function (r) {
+      if (r.error || !r.data) { bankBox.appendChild(h('p', { 'class': 'muted', text: 'Run add-bank.sql in Supabase to turn on the bank and diamond cap.' })); return; }
+      var d = r.data, f = function (n) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
+      var cap = h('input', { type: 'number', min: 0, step: 100, value: Number(d.cap), 'aria-label': 'Total diamond cap' });
+      bankBox.appendChild(h('div', { 'class': 'who' }, h('b', { text: 'Bank' }), h('span', { text: f(d.bank) + 'dia left of ' + f(d.cap) + ' total' })));
+      bankBox.appendChild(h('p', { 'class': 'muted', style: 'margin:6px 0', text: f(d.wallets) + ' in wallets, ' + f(d.markets) + ' locked in live markets. Prizes and starter diamonds come out of the bank.' }));
+      bankBox.appendChild(h('div', { 'class': 'acts', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, h('label', { text: 'Total cap' }), cap,
+        h('button', { 'class': 'btn small', type: 'button', text: 'Set cap', onclick: function () { actRpc(sb.rpc('admin_set_cap', { p_cap: Number(cap.value) }), 'Cap updated.'); } })));
+    });
     var shown = [];
     sb.rpc('market_supply').then(function (r) {
       if (r.error || !r.data) { supply.textContent = 'Run add-diamond-supply.sql in Supabase to see the total.'; return; }

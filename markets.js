@@ -60,6 +60,7 @@
       buy: function (u, p, id, side, spend) { return rpc('market_buy', { p_user: u, p_pin: p, p_market: id, p_side: side, p_spend: spend }); },
       sell: function (u, p, id, side, sh) { return rpc('market_sell', { p_user: u, p_pin: p, p_market: id, p_side: side, p_shares: sh }); },
       propose: function (u, p, q, d, c) { return rpc('market_propose', { p_user: u, p_pin: p, p_question: q, p_description: d, p_closes_at: c }); },
+      bank: function () { return sb.rpc('bank_info').then(function (r) { return r.error || !r.data ? null : r.data; }, function () { return null; }); },
       supply: function () { return sb.rpc('market_supply').then(function (r) { return r.error || !r.data ? null : Number(r.data.total); }, function () { return null; }); },
       history: function (id) {
         return sb.rpc('market_history', { p_market: id }).then(function (r) { return r.error ? [] : r.data.map(function (x) { return Number(x.price_yes); }); }, function () { return []; });
@@ -114,6 +115,7 @@
       },
       propose: function () { return done({ ok: true }); },
       link: function (u, p) { return done({ ok: true }); },
+      bank: function () { return D.supplyFn().then(function (t) { return { cap: 10000, wallets: t, markets: 0, bank: 10000 - t }; }); },
       supply: function () { return D.supplyFn(); },
       history: function (id) { return done((D.hist[id] || []).slice()); }
     };
@@ -312,7 +314,10 @@
     markets.forEach(function (m) { (m.status === 'settled' ? groups.done : isOpen(m) ? groups.open : groups.wait).push(m); });
     $('st-open').textContent = groups.open.length;
     $('st-vol').textContent = money(markets.reduce(function (a, m) { return a + (m.volume || 0); }, 0));
-    api.supply().then(function (t) { $('st-sup').textContent = t === null ? '-' : money(t); });
+    api.bank().then(function (b) {
+      if (b) { $('st-sup').textContent = money(Number(b.wallets)); $('st-bank').textContent = money(Number(b.bank)); $('st-bank').parentNode.title = 'Total supply ' + money(Number(b.cap)) + '. ' + money(Number(b.markets)) + ' is locked inside live markets.'; }
+      else api.supply().then(function (t) { $('st-sup').textContent = t === null ? '-' : money(t); });
+    });
     [['sec-open', 'Open markets', groups.open, 'No open markets right now.'], ['sec-wait', 'Waiting for a result', groups.wait, null], ['sec-done', 'Settled', groups.done, null]].forEach(function (g) {
       var sec = $(g[0]); clear(sec);
       if (!g[2].length && !g[3]) return;
