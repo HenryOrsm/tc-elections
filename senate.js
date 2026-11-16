@@ -48,6 +48,7 @@
   })();
 
   function friendly(err) {
+    if (err && err.userMsg) return err.userMsg;
     var m = (err && (err.message || err.details)) || '', code = err && err.code;
     if (code === '23505') {
       if (m.indexOf('senate_votes_one_per_user') !== -1) return 'That username has already voted in the senate race.';
@@ -81,8 +82,11 @@
         demoData.votes.push({ mc: v.name, nation: v.nation, cand: v.candidateId });
         return Promise.resolve();
       }
-      return sb.from('senate_votes').insert({ mc_username: v.name, nation: v.nation, candidate_id: v.candidateId })
-        .then(function (r) { if (r.error) throw r.error; });
+      return sb.rpc('cast_senate_vote', { p_user: v.name, p_pin: v.pin, p_nation: v.nation, p_candidate: v.candidateId })
+        .then(function (r) {
+          if (r.error) throw r.error;
+          if (r.data && r.data.ok === false) { var e = new Error(r.data.error); e.userMsg = r.data.error; throw e; }
+        });
     },
     adminVote: function (v) {
       if (demo) {
@@ -448,7 +452,7 @@
         if (!pick) { vmsg.textContent = 'Pick a candidate.'; vmsg.className = 'msg err'; return; }
         btn.disabled = true; vmsg.textContent = 'Sending...'; vmsg.className = 'msg';
         var req = isAdmin ? api.adminVote({ nation: n, candidateId: pick.value, count: bulk.get() })
-                          : api.vote({ name: state.me.name, nation: n, candidateId: pick.value });
+                          : api.vote({ name: state.me.name, pin: state.me.pin, nation: n, candidateId: pick.value });
         req.then(function () {
           if (isAdmin) { vmsg.textContent = bulk.get().toLocaleString() + ' admin test ' + (bulk.get() === 1 ? 'vote' : 'votes') + ' counted. Vote as many times as you like.'; vmsg.className = 'msg'; }
           else { setLock(state.me.name); state.voted = pick.getAttribute('data-name'); renderGate(); }
@@ -465,12 +469,13 @@
 
   $('id-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    var name = $('s-name').value.trim(), nation = $('s-nation').value;
+    var name = $('s-name').value.trim(), nation = $('s-nation').value, pin = $('s-pin').value.trim();
     if (!isAdmin && !USER_RE.test(name)) return msg('s-msg', 'Enter your Minecraft username (3 to 32 letters, numbers, underscores, dots or spaces).', true);
+    if (!isAdmin && !/^[0-9]{4,8}$/.test(pin)) return msg('s-msg', 'Enter your 4 to 8 digit markets PIN. No wallet yet? Make one on the Markets page first.', true);
     if (!nation) return msg('s-msg', 'Choose your nation.', true);
     if (!name) name = 'Admin';
     msg('s-msg', '', false);
-    state.me = { name: name, nation: nation }; state.voted = null; state.ballotKey = '';
+    state.me = { name: name, nation: nation, pin: pin }; state.voted = null; state.ballotKey = '';
     renderBallot();
     $('ballot').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });

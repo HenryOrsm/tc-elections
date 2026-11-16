@@ -39,6 +39,7 @@
   })();
 
   function friendly(err) {
+    if (err && err.userMsg) return err.userMsg;
     var m = (err && (err.message || err.details)) || '';
     var code = err && err.code;
     if (code === '23505') {
@@ -86,8 +87,11 @@
         demoData.votes.push({ mc: v.name, nation: v.nation, cand: v.candidateId });
         return Promise.resolve();
       }
-      return sb.from('votes').insert({ mc_username: v.name, nation: v.nation, candidate_id: v.candidateId })
-        .then(function (r) { if (r.error) throw r.error; });
+      return sb.rpc('cast_vote', { p_user: v.name, p_pin: v.pin, p_nation: v.nation, p_candidate: v.candidateId })
+        .then(function (r) {
+          if (r.error) throw r.error;
+          if (r.data && r.data.ok === false) { var e = new Error(r.data.error); e.userMsg = r.data.error; throw e; }
+        });
     },
     adminVote: function (v) {
       if (demo) {
@@ -485,14 +489,15 @@
   $('vote-form').addEventListener('submit', function (e) {
     e.preventDefault();
     if ($('v-hp').value) return;
-    var name = $('v-name').value.trim(), nation = $('v-nation').value;
+    var name = $('v-name').value.trim(), nation = $('v-nation').value, pin = $('v-pin').value.trim();
     var pick = document.querySelector('input[name=cand]:checked');
     if (!isAdmin && !USER_RE.test(name)) return msg('v-msg', 'Enter your Minecraft username (3 to 32 letters, numbers, underscores, dots or spaces).', true);
+    if (!isAdmin && !/^[0-9]{4,8}$/.test(pin)) return msg('v-msg', 'Enter your 4 to 8 digit markets PIN. No wallet yet? Make one on the Markets page first.', true);
     if (!nation) return msg('v-msg', 'Choose your nation.', true);
     if (!pick) return msg('v-msg', 'Pick a candidate.', true);
     var btn = $('v-submit'); btn.disabled = true; msg('v-msg', 'Sending...', false);
     var req = isAdmin ? api.adminVote({ nation: nation, candidateId: pick.value, count: bulk.get() })
-                      : api.vote({ name: name, nation: nation, candidateId: pick.value });
+                      : api.vote({ name: name, pin: pin, nation: nation, candidateId: pick.value });
     req.then(function () {
       if (isAdmin) {
         msg('v-msg', bulk.get().toLocaleString() + ' admin test ' + (bulk.get() === 1 ? 'vote' : 'votes') + ' counted. Vote as many times as you like.', false);
@@ -501,7 +506,7 @@
         state.voteNote = 'Vote counted. Thanks, ' + name + '! It is one vote per person, so voting is now locked on this device. If something went wrong, ask an admin to change your vote.';
         renderGate();
       }
-      $('v-name').value = '';
+      $('v-name').value = ''; $('v-pin').value = '';
       return refresh();
     }).catch(function (err) { msg('v-msg', friendly(err), true); })
       .then(function () { btn.disabled = false; });
