@@ -163,7 +163,7 @@
     if (wallet) {
       box.appendChild(h('p', { style: 'margin:0 0 10px' }, 'Signed in as ', h('b', { text: wallet.name }), '. Balance: ', h('b', null, dm(wallet.balance))));
       box.appendChild(h('button', { 'class': 'btn small ghost', type: 'button', text: 'Log out', onclick: function () { session = null; wallet = null; saveSession(null); renderAll(); } }));
-      box.appendChild(h('p', { 'class': 'muted', style: 'margin:10px 0 0', text: 'To add or cash out real diamonds, hand them to an admin in-game and they will update your balance.' }));
+      box.appendChild(h('p', { 'class': 'muted', style: 'margin:10px 0 0', text: 'Diamonds are the TrainCraft currency. They only exist on this site and cannot be cashed out for anything.' }));
       return;
     }
     var user = h('input', { id: 'w-user', type: 'text', maxlength: 32, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });

@@ -293,7 +293,7 @@
     // wallets
     var wu = h('input', { type: 'text', placeholder: 'Minecraft username', 'aria-label': 'Wallet username', autocomplete: 'off' });
     var wa = h('input', { type: 'number', step: 'any', placeholder: 'Diamonds (negative to take away)', 'aria-label': 'Amount' });
-    var wr = h('input', { type: 'text', maxlength: 80, placeholder: 'Note, e.g. deposited 10 real diamonds', 'aria-label': 'Note' });
+    var wr = h('input', { type: 'text', maxlength: 80, placeholder: 'Reason, e.g. won the build contest', 'aria-label': 'Note' });
     wal.appendChild(h('div', { 'class': 'item', style: 'display:block' },
       h('div', { 'class': 'who' }, h('b', { text: 'Add or remove diamonds' }), wu, wa, wr),
       h('div', { 'class': 'acts', style: 'margin-top:8px' }, h('button', { 'class': 'btn small', type: 'button', text: 'Apply', onclick: function () {
