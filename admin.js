@@ -37,7 +37,7 @@
         sb.from('senate_votes').select('id', { count: 'exact', head: true }).like('mc_username', 'admin_test_%'),
         sb.from('parties').select('*').order('sort', { ascending: true }).order('created_at', { ascending: true }),
         sb.from('markets').select('*').order('created_at', { ascending: false }),
-        sb.from('wallets').select('username,display_name,balance').order('balance', { ascending: false }).limit(300),
+        sb.from('wallets').select('username,display_name,balance,discord_name').order('balance', { ascending: false }).limit(300),
         sb.from('market_settings').select('*')
       ]).then(function (res) {
         partyRows = res[7].error ? null : res[7].data;
@@ -317,8 +317,8 @@
     });
     wallets.forEach(function (w) {
       var pct = h('span', { 'class': 'muted', text: '' }); shown.push({ w: w, el: pct });
-      wal.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: w.display_name }), h('span', { text: Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia' }), pct),
-        h('div', { 'class': 'acts' }, h('button', { 'class': 'btn small ghost', type: 'button', text: 'Use name', onclick: function () { wu.value = w.display_name; pu.value = w.display_name; wa.focus(); } }))));
+      wal.appendChild(h('div', { 'class': 'item' }, h('div', { 'class': 'who' }, h('b', { text: w.display_name }), h('span', { text: Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia' }), pct, h('span', { 'class': 'muted', text: w.discord_name ? 'Discord: ' + w.discord_name : 'No Discord linked' })),
+        h('div', { 'class': 'acts' }, w.discord_name ? h('button', { 'class': 'btn small ghost', type: 'button', text: 'Unlink Discord', onclick: function () { if (confirm('Unlink Discord from ' + w.display_name + '? They will have to link again.')) actRpc(sb.rpc('admin_unlink_discord', { p_user: w.username }), 'Unlinked.'); } }) : null, h('button', { 'class': 'btn small ghost', type: 'button', text: 'Use name', onclick: function () { wu.value = w.display_name; pu.value = w.display_name; wa.focus(); } }))));
     });
   }
 

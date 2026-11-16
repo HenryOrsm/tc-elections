@@ -35,6 +35,11 @@
 
   /* ---------- data layer: real (Supabase) or demo (in memory) ---------- */
   var api;
+  function startDiscord(mode, u, p) {
+    try { sessionStorage.setItem('dl-pending', JSON.stringify({ user: u, pin: p, mode: mode })); } catch (e) {}
+    return sb.auth.signInWithOAuth({ provider: 'discord', options: { scopes: 'identify guilds', redirectTo: location.origin + location.pathname } })
+      .then(function (r) { return r.error ? { ok: false, error: 'Could not start Discord login.' } : { ok: false, error: 'Taking you to Discord...' }; });
+  }
   if (!demo) {
     var rpc = function (name, args) {
       return sb.rpc(name, args).then(function (r) { return r.error ? { ok: false, error: r.error.message } : r.data; },
@@ -49,7 +54,8 @@
         return sb.from('market_settings').select('value').eq('key', 'starter_diamonds').maybeSingle()
           .then(function (r) { return r.data ? Number(r.data.value) : null; }, function () { return null; });
       },
-      register: function (u, p) { return rpc('market_register', { p_user: u, p_pin: p }); },
+      register: function (u, p) { return startDiscord('register', u, p); },
+      link: function (u, p) { return startDiscord('link', u, p); },
       login: function (u, p) { return rpc('market_login', { p_user: u, p_pin: p }); },
       buy: function (u, p, id, side, spend) { return rpc('market_buy', { p_user: u, p_pin: p, p_market: id, p_side: side, p_spend: spend }); },
       sell: function (u, p, id, side, sh) { return rpc('market_sell', { p_user: u, p_pin: p, p_market: id, p_side: side, p_shares: sh }); },
@@ -107,6 +113,7 @@
         return done({ ok: true, shares: sh, received: got, balance: w.balance });
       },
       propose: function () { return done({ ok: true }); },
+      link: function (u, p) { return done({ ok: true }); },
       supply: function () { return D.supplyFn(); },
       history: function (id) { return done((D.hist[id] || []).slice()); }
     };
@@ -168,7 +175,11 @@
       if (!c.user || !c.pin) { msg.textContent = 'Enter your username and a PIN.'; msg.className = 'msg err'; return; }
       msg.textContent = 'One sec...'; msg.className = 'msg';
       fn(c).then(function (r) {
-        if (!r.ok) { msg.textContent = r.error || 'That did not work.'; msg.className = 'msg err'; return; }
+        if (!r.ok) {
+          msg.textContent = r.error || 'That did not work.'; msg.className = 'msg err';
+          if (/Link your Discord/.test(r.error || '')) msg.appendChild(h('div', { style: 'margin-top:8px' }, h('button', { 'class': 'btn small', type: 'button', text: 'Link my Discord', onclick: function () { go(function (c2) { return api.link(c2.user, c2.pin); }); } })));
+          return;
+        }
         // after register, log in to load positions
         return api.login(c.user, c.pin).then(function (lr) { applyLogin(lr, c); return refreshMarkets(); }).then(renderAll);
       });
@@ -176,10 +187,10 @@
     var form = h('form', { style: 'max-width:520px', novalidate: 'novalidate' },
       h('div', { 'class': 'field' }, h('label', { 'for': 'w-user', text: 'Minecraft username' }), user),
       h('div', { 'class': 'field' }, h('label', { 'for': 'w-pin', text: 'PIN' }), pin,
-        h('span', { 'class': 'hint', text: 'New here? Pick any PIN and press Create wallet' + (starter ? ' to get ' + money(starter) + ' free' : '') + '. You need the same PIN every time, so remember it. Admins can reset it.' })),
+        h('span', { 'class': 'hint', text: 'New here? Pick any PIN and press Create wallet with Discord' + (starter ? ' to get ' + money(starter) + ' free' : '') + '. You must be in the TrainCraft Discord. You need the same PIN every time, so remember it. Admins can reset it. Already have a wallet from before? Log in, then press Link my Discord.' })),
       h('div', { 'class': 'acts', style: 'display:flex;gap:8px;flex-wrap:wrap' },
         h('button', { 'class': 'btn', type: 'submit', text: 'Log in' }),
-        h('button', { 'class': 'btn ghost', type: 'button', text: 'Create wallet', onclick: function () { go(function (c) { return api.register(c.user, c.pin); }); } })),
+        h('button', { 'class': 'btn ghost', type: 'button', text: 'Create wallet with Discord', onclick: function () { go(function (c) { return api.register(c.user, c.pin); }); } })),
       msg);
     form.addEventListener('submit', function (e) { e.preventDefault(); go(function (c) { return api.login(c.user, c.pin); }); });
     box.appendChild(form);
@@ -331,11 +342,32 @@
   });
   $('refresh').addEventListener('click', refreshAll);
 
+  /* ---------- coming back from Discord ---------- */
+  function finishDiscord() {
+    if (demo) return Promise.resolve();
+    var p = null; try { p = JSON.parse(sessionStorage.getItem('dl-pending') || 'null'); } catch (e) {}
+    if (!p) return Promise.resolve();
+    return sb.auth.getSession().then(function (r) {
+      var ses = r.data && r.data.session;
+      if (!ses || !ses.provider_token) { if (/[?#&](code|access_token|error)=/.test(location.href) === false) try { sessionStorage.removeItem('dl-pending'); } catch (e) {} return; }
+      try { sessionStorage.removeItem('dl-pending'); } catch (e) {}
+      say('m-msg', 'Checking the Discord server...', false);
+      return sb.functions.invoke('link-discord', { body: { provider_token: ses.provider_token, username: p.user, pin: p.pin, mode: p.mode } }).then(function (x) {
+        var d = x.data;
+        sb.auth.signOut();
+        history.replaceState(null, '', location.pathname);
+        if (!d || !d.ok) { say('m-msg', (d && d.error) || 'Could not finish linking. Try again.', true); return; }
+        say('m-msg', 'Discord linked. You are in!', false);
+        return api.login(p.user, p.pin).then(function (lr) { applyLogin(lr, { user: p.user, pin: p.pin }); });
+      }, function () { say('m-msg', 'Could not reach the server. Try again.', true); });
+    });
+  }
+
   /* ---------- start ---------- */
   $('demo-banner').hidden = !demo;
   renderAll();
   api.starter().then(function (v) { starter = v; if (!wallet) renderWallet(); });
-  refreshAll();
+  finishDiscord().then(refreshAll, refreshAll);
   setInterval(function () {
     var a = document.activeElement;
     if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return;   // don't wipe what someone is typing
