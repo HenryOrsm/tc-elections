@@ -315,7 +315,7 @@
     $('st-open').textContent = groups.open.length;
     $('st-vol').textContent = money(markets.reduce(function (a, m) { return a + (m.volume || 0); }, 0));
     api.bank().then(function (b) {
-      if (b) { $('st-sup').textContent = money(Number(b.wallets)); $('st-bank').textContent = money(Number(b.bank)); $('st-bank').parentNode.title = 'Total supply ' + money(Number(b.cap)) + '. ' + money(Number(b.markets)) + ' is locked inside live markets.'; }
+      if (b) { $('st-sup').textContent = money(Number(b.wallets) + Number(b.corps || 0)); $('st-bank').textContent = money(Number(b.bank)); $('st-bank').parentNode.title = 'Total supply ' + money(Number(b.cap)) + '. ' + money(Number(b.markets)) + ' is locked inside live markets.'; }
       else api.supply().then(function (t) { $('st-sup').textContent = t === null ? '-' : money(t); });
     });
     [['sec-open', 'Open markets', groups.open, 'No open markets right now.'], ['sec-wait', 'Waiting for a result', groups.wait, null], ['sec-done', 'Settled', groups.done, null]].forEach(function (g) {

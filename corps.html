@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corporations | World Election</title>
+<meta name="description" content="Start corporations, trade shares and pay other players with diamonds.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Source+Serif+4:wght@600;700&amp;display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="demo-banner" class="banner" hidden>Demo mode: corporations need the live database. Add your Supabase keys in <code>js/config.js</code>.</div>
+<div id="load-error" class="banner err" role="alert" hidden></div>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="brand"><span class="logo-tile"><img src="logo.png" alt="TC server logo" width="58" height="43"></span><span>World Election</span></div>
+    <nav class="nav" aria-label="Sections"><a href="index.html"><span data-race="short">President</span></a><a href="senate.html">Senate</a><a href="markets.html">Markets</a><a href="corps.html" aria-current="page">Corps</a><a href="predict.html">Predict</a><a href="archive.html">Archive</a></nav>
+    <div class="live"><span class="dot" aria-hidden="true"></span><span>Live</span><button id="refresh" class="link-btn" type="button">Refresh</button></div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Companies and stocks</p>
+      <h1>Corporations</h1>
+      <p class="headline">Start a company, sell shares, pay dividends, trade stocks and pay other players.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="st-n">0</b><span>Corporations</span></div>
+      <div class="stat"><b id="st-cap">-</b><span>Total market cap</span></div>
+      <div class="stat"><b id="st-bal">-</b><span>Your diamonds</span></div>
+    </div>
+  </section>
+
+  <div id="status" class="msg" role="status" style="margin-bottom: 12px"></div>
+
+  <section class="grid2">
+    <div class="card"><h2>Your wallet</h2><div id="wallet"></div></div>
+    <div class="card"><h2>Pay a player</h2><div id="pay"></div></div>
+  </section>
+
+  <section class="card" style="margin-bottom: 24px">
+    <h2>All corporations</h2>
+    <div id="corp-list"></div>
+  </section>
+
+  <section id="detail" class="card" style="margin-bottom: 24px" hidden></section>
+
+  <section class="card" style="margin-bottom: 24px">
+    <h2>Start a corporation</h2>
+    <div id="create"></div>
+  </section>
+</main>
+
+<footer class="wrap"><p>Diamonds are the TrainCraft currency. They only exist on this site and cannot be cashed out for anything.</p></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="settings.js"></script>
+<script src="common.js"></script>
+<script>EL.boot('corps.js');</script>
+</body>
+</html>

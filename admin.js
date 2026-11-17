@@ -262,6 +262,30 @@
         act(sb.from('market_settings').update({ value: Math.max(0, Number(st.value) || 0) }).eq('key', 'starter_diamonds'), 'Starter diamonds updated.');
       } }))));
 
+    // corporation fees
+    [['corp_fee', 'Corporation registration fee', 'Diamonds it costs to start a corporation (goes back to the bank).', 50, 1], ['transfer_fee_pct', 'Player payment fee (%)', 'Percent added on top of every player-to-player payment (goes back to the bank). 0 means free.', 0, 0.5]].forEach(function (cfg) {
+      var row = (settings || []).filter(function (r) { return r.key === cfg[0]; })[0];
+      if (!row) return;
+      var inp = h('input', { type: 'number', min: 0, step: cfg[4], value: row.value, 'aria-label': cfg[1], style: 'width:110px' });
+      tools.appendChild(h('div', { 'class': 'item' },
+        h('div', { 'class': 'who' }, h('b', { text: cfg[1] }), h('span', { text: cfg[2] })),
+        h('div', { 'class': 'acts' }, inp, h('button', { 'class': 'btn small', type: 'button', text: 'Save', onclick: function () {
+          act(sb.from('market_settings').update({ value: Math.max(0, Number(inp.value) || 0) }).eq('key', cfg[0]), cfg[1] + ' updated.');
+        } }))));
+    });
+    var corpBox = h('div', { 'class': 'item', style: 'display:block' }); tools.appendChild(corpBox);
+    sb.from('corps_view').select('id,ticker,name,owner_name,balance').order('created_at').then(function (r) {
+      if (r.error) { corpBox.appendChild(h('p', { 'class': 'muted', text: 'Run add-corporations.sql in Supabase to turn on corporations.' })); return; }
+      corpBox.appendChild(h('b', { text: 'Corporations' }));
+      if (!r.data.length) corpBox.appendChild(h('p', { 'class': 'muted', text: 'None yet.' }));
+      r.data.forEach(function (c) {
+        corpBox.appendChild(h('div', { 'class': 'row-head', style: 'margin:6px 0' }, h('span', null, h('b', { text: c.ticker }), ' ' + c.name + ' (owner ' + c.owner_name + ', wallet ' + Number(c.balance).toFixed(2) + 'dia)'),
+          h('button', { 'class': 'btn small danger', type: 'button', text: 'Dissolve', onclick: function () {
+            if (confirm('Dissolve ' + c.ticker + '? Its wallet goes back to the bank and all shares vanish. This cannot be undone.')) actRpc(sb.rpc('admin_dissolve_corp', { p_corp: c.id }), c.ticker + ' dissolved.');
+          } })));
+      });
+    });
+
     // proposals
     var pending = markets.filter(function (m) { return m.status === 'pending'; });
     $('mk-pend-n').textContent = '(' + pending.length + ')';
@@ -315,7 +339,7 @@
       var d = r.data, f = function (n) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
       var cap = h('input', { type: 'number', min: 0, step: 100, value: Number(d.cap), 'aria-label': 'Total diamond cap' });
       bankBox.appendChild(h('div', { 'class': 'who' }, h('b', { text: 'Bank' }), h('span', { text: f(d.bank) + 'dia left of ' + f(d.cap) + ' total' })));
-      bankBox.appendChild(h('p', { 'class': 'muted', style: 'margin:6px 0', text: f(d.wallets) + ' in wallets, ' + f(d.markets) + ' locked in live markets. Prizes and starter diamonds come out of the bank.' }));
+      bankBox.appendChild(h('p', { 'class': 'muted', style: 'margin:6px 0', text: f(d.wallets) + ' in wallets, ' + f(d.corps || 0) + ' in corporations, ' + f(d.markets) + ' locked in live markets. Prizes and starter diamonds come out of the bank.' }));
       bankBox.appendChild(h('div', { 'class': 'acts', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, h('label', { text: 'Total cap' }), cap,
         h('button', { 'class': 'btn small', type: 'button', text: 'Set cap', onclick: function () { actRpc(sb.rpc('admin_set_cap', { p_cap: Number(cap.value) }), 'Cap updated.'); } })));
     });
