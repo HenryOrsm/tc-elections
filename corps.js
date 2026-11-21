@@ -12,11 +12,12 @@
   function saveSession(v) { try { if (v) sessionStorage.setItem(SKEY, JSON.stringify(v)); else sessionStorage.removeItem(SKEY); } catch (e) {} }
   var session = loadSession();
   var wallet = null, me = null, corps = [], feed = [], sel = null, detail = null, fees = { corp: 50, transfer: 0 };
-  var ticket = { side: 'buy', price: '', shares: '' };
+  var ticket = { side: 'buy', shares: '' }, range = 24, sparks = {}, seen = {};
 
   function money(n) { return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'dia'; }
   function px(n) { n = Number(n); return n.toLocaleString(undefined, { minimumFractionDigits: n < 1 ? 4 : 2, maximumFractionDigits: 4 }) + 'dia'; }
   function num(n) { return Number(n).toLocaleString(); }
+  function sgn(n) { return (n >= 0 ? '+' : '') + money(n); }
   function pc(p) { return (p >= 0 ? '+' : '') + (p * 100).toFixed(2) + '%'; }
   function status(t, err) { var m = $('status'); m.textContent = t || ''; m.className = 'msg' + (err ? ' err' : ''); }
   function mcap(c) { return c.last_price === null || c.last_price === undefined ? null : Number(c.last_price) * c.total_shares; }
@@ -43,27 +44,28 @@
   function loadCorps() {
     return Promise.all([
       rows(sb.from('corps_stats_view').select('*').order('created_at', { ascending: true })),
-      rows(sb.from('corp_posts_view').select('*').order('created_at', { ascending: false }).limit(12))
-    ]).then(function (r) { corps = r[0]; feed = r[1]; });
+      rows(sb.from('corp_posts_view').select('*').order('created_at', { ascending: false }).limit(12)),
+      rpc('market_sparks')
+    ]).then(function (r) { corps = r[0]; feed = r[1]; sparks = (r[2] && !r[2].error && typeof r[2] === 'object' && !r[2].ok) ? r[2] : {}; });
   }
   function loadDetail() {
     var c = corps.filter(function (x) { return x.ticker === sel; })[0];
     if (!c) { detail = null; return Promise.resolve(); }
     return Promise.all([
-      rows(sb.from('corp_depth_view').select('*').eq('corp_id', c.id)),
+      rpc('price_series', { p_corp: c.id, p_hours: range }),
       rows(sb.from('corp_holders_view').select('*').eq('corp_id', c.id).order('shares', { ascending: false })),
-      rows(sb.from('share_trades_view').select('*').eq('corp_id', c.id).order('created_at', { ascending: false }).limit(200)),
+      rows(sb.from('share_trades_view').select('*').eq('corp_id', c.id).gt('shares', 0).order('created_at', { ascending: false }).limit(12)),
       rows(sb.from('corp_log').select('*').eq('corp_id', c.id).order('created_at', { ascending: false }).limit(10)),
       rows(sb.from('corp_posts_view').select('*').eq('corp_id', c.id).order('created_at', { ascending: false }).limit(8)),
       rpc('stock_quote', { p_corp: c.id })
-    ]).then(function (r) { detail = { corp: c, depth: r[0], holders: r[1], trades: r[2], log: r[3], posts: r[4], quote: r[5] }; });
+    ]).then(function (r) { detail = { corp: c, series: Array.isArray(r[0]) ? r[0] : [], holders: r[1], trades: r[2], log: r[3], posts: r[4], quote: r[5] }; });
   }
   function loadFees() {
     return rows(sb.from('market_settings').select('key,value').in('key', ['corp_fee', 'transfer_fee_pct'])).then(function (l) {
       l.forEach(function (x) { if (x.key === 'corp_fee') fees.corp = Number(x.value); if (x.key === 'transfer_fee_pct') fees.transfer = Number(x.value); });
     });
   }
-  function reload() { return Promise.all([loadWallet(), loadCorps()]).then(loadDetail).then(render); }
+  function reload() { return rpc('market_tick').then(function () { return Promise.all([loadWallet(), loadCorps()]); }).then(loadDetail).then(render); }
 
   /* ---------- small form helper ---------- */
   function mini(title, fields, btnText, run, hint) {
@@ -124,7 +126,7 @@
   }
   function pick(ticker) {
     sel = ticker; try { history.replaceState(null, '', '#' + ticker); } catch (e) {}
-    ticket = { side: 'buy', price: '', shares: '' };
+    ticket = { side: 'buy', shares: '' };
     loadDetail().then(function () { render(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   }
 
@@ -177,18 +179,16 @@
       totalVal += val; totalPnl += pnl;
       rowsOut.push({ c: c, sh: sh, val: val, avg: b.shares > 0 ? Number(b.cost) / b.shares : null, unreal: unreal, real: Number(b.realized), div: Number(b.dividends), pnl: pnl });
     });
-    var escrow = me.bids.reduce(function (a, x) { return a + Number(x.shares) * Number(x.price); }, 0);
+    var escrow = 0;
     var st = h('div', { 'class': 'stats', style: 'margin:0 0 12px' });
     [[money(wallet.balance), 'Cash'], [money(totalVal), 'Shares value'], [money(wallet.balance + totalVal + escrow), 'Net worth'], [(totalPnl >= 0 ? '+' : '') + money(totalPnl), 'Total profit and loss']].forEach(function (x) {
       st.appendChild(h('div', { 'class': 'stat' }, h('b', { text: x[0] }), h('span', { text: x[1] })));
     });
     box.appendChild(st);
-    if (escrow > 0) box.appendChild(h('p', { 'class': 'muted', text: money(escrow) + ' is locked in your open buy orders.' }));
     if (!rowsOut.length) { box.appendChild(h('p', { 'class': 'muted', text: 'You do not own any shares yet.' })); return; }
     var t = h('table'); t.appendChild(headRow(['Stock', 'Shares', 'Value', 'Avg cost', 'Unrealized', 'Realized', 'Dividends', 'Total']));
     var tb = h('tbody');
     rowsOut.sort(function (a, b) { return b.val - a.val; }).forEach(function (r) {
-      var sgn = function (n) { return (n >= 0 ? '+' : '') + money(n); };
       tb.appendChild(h('tr', { style: 'cursor:pointer', onclick: function () { pick(r.c.ticker); } }, h('td', null, h('b', { text: r.c.ticker })), h('td', { text: num(r.sh) }), h('td', { text: money(r.val) }),
         h('td', { text: r.avg === null ? '-' : px(r.avg) }), h('td', { text: sgn(r.unreal) }), h('td', { text: sgn(r.real) }), h('td', { text: sgn(r.div) }), h('td', null, h('b', { text: sgn(r.pnl) }))));
     });
@@ -197,51 +197,68 @@
   }
 
   /* ---------- list ---------- */
+  function spark(pts, up) {
+    var W = 84, H = 24, svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, 'aria-hidden': 'true' });
+    if (!pts || pts.length < 2) return svg;
+    var lo = Math.min.apply(null, pts), hi = Math.max.apply(null, pts); if (hi === lo) { hi += 0.01; lo -= 0.01; }
+    var d = pts.map(function (v, i) { return (i ? 'L' : 'M') + (i / (pts.length - 1) * (W - 2) + 1).toFixed(1) + ' ' + (H - 2 - (Number(v) - lo) / (hi - lo) * (H - 4)).toFixed(1); }).join(' ');
+    svg.appendChild(s('path', { d: d, fill: 'none', stroke: up ? '#1B7F46' : '#B3261E', 'stroke-width': 1.6, 'stroke-linejoin': 'round' }));
+    return svg;
+  }
+  function tickArrow(c) {
+    var o = seen[c.ticker], n = Number(c.last_price);
+    if (o === undefined || c.last_price === null || o === n) return '';
+    return h('span', { style: 'font-size:11px;margin-left:4px;color:' + (n > o ? '#1B7F46' : '#B3261E'), text: n > o ? '▲' : '▼' });
+  }
   function renderList() {
     var box = $('corp-list'); clear(box);
     if (!corps.length) { box.appendChild(h('p', { 'class': 'muted', text: 'No corporations yet. Be the first to start one below.' })); return; }
     var sorted = corps.slice().sort(function (a, b) { return (mcap(b) || 0) - (mcap(a) || 0); });
     var t = h('table');
-    t.appendChild(headRow(['Ticker', 'Name', 'Owner', 'Price', '24h', 'Market cap', 'Cash / share', '24h volume']));
+    t.appendChild(headRow(['Ticker', 'Name', 'Price', '24h', 'Last 24h', 'Market cap', '24h volume']));
     var tb = h('tbody');
     sorted.forEach(function (c) {
-      var m = mcap(c);
+      var m = mcap(c), p = chg(c), sp = sparks[c.ticker];
       tb.appendChild(h('tr', { style: 'cursor:pointer' + (c.ticker === sel ? ';background:rgba(20,120,140,.08)' : ''), onclick: function () { pick(c.ticker); } },
-        h('td', null, h('b', { text: c.ticker })), h('td', { text: c.name }), h('td', { text: c.owner_name }),
-        h('td', { text: c.last_price === null ? 'no trades' : px(c.last_price) }), h('td', null, chgEl(chg(c))), h('td', { text: m ? money(m) : '-' }),
-        h('td', { text: px(c.book_value) }), h('td', { text: money(c.vol24) })));
+        h('td', null, h('b', { text: c.ticker })), h('td', { text: c.name }),
+        h('td', null, c.last_price === null ? 'not trading' : px(c.last_price), tickArrow(c)), h('td', null, chgEl(p)),
+        h('td', null, spark(sp, p === null || p >= 0)), h('td', { text: m ? money(m) : '-' }), h('td', { text: money(c.vol24) })));
     });
     t.appendChild(tb);
     var wrap = h('div', { style: 'overflow-x:auto' }); wrap.appendChild(t); box.appendChild(wrap);
+    corps.forEach(function (c) { if (c.last_price !== null) seen[c.ticker] = Number(c.last_price); });
   }
 
   /* ---------- chart ---------- */
-  function chart(trades, c) {
-    var pts = trades.filter(function (t) { return !t.mm; }).map(function (t) { return { x: new Date(t.created_at).getTime(), y: Number(t.price) }; }).sort(function (a, b) { return a.x - b.x; });
-    var W = 640, H = 200, pad = { l: 56, r: 12, t: 12, b: 24 };
-    var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, width: '100%', role: 'img', 'aria-label': 'Price history of ' + c.ticker, style: 'max-width:100%;height:auto' });
+  function chart(series, c) {
+    var W = 640, H = 240, pad = { l: 58, r: 12, t: 12, b: 26 };
+    var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, width: '100%', role: 'img', 'aria-label': 'Price chart of ' + c.ticker, style: 'max-width:100%;height:auto' });
+    var pts = (series || []).map(function (k) { return { t: new Date(k.t).getTime(), o: Number(k.o), h: Number(k.h), l: Number(k.l), c: Number(k.c) }; });
     if (pts.length < 2) {
-      svg.appendChild(s('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: '#6B7688', 'font-size': 14, text: pts.length ? 'Only one trade so far (' + px(pts[0].y) + ')' : 'No trades yet' }));
+      svg.appendChild(s('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: '#6B7688', 'font-size': 14, text: c.last_price === null ? 'Not trading yet' : 'Not enough history yet. Check back soon.' }));
       return svg;
     }
-    var xs = pts.map(function (p) { return p.x; }), ys = pts.map(function (p) { return p.y; });
-    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-    if (y1 === y0) { y1 += y1 * 0.1 + 0.01; y0 = Math.max(0, y0 - y0 * 0.1); }
-    var X = function (v) { return pad.l + (x1 === x0 ? 0 : (v - x0) / (x1 - x0)) * (W - pad.l - pad.r); };
-    var Y = function (v) { return H - pad.b - (v - y0) / (y1 - y0) * (H - pad.t - pad.b); };
-    [0, 0.5, 1].forEach(function (f) {
-      var v = y0 + (y1 - y0) * f, y = Y(v);
+    var lo = Math.min.apply(null, pts.map(function (k) { return k.l; })), hi = Math.max.apply(null, pts.map(function (k) { return k.h; }));
+    var padv = (hi - lo) * 0.08 || hi * 0.05 || 0.01; lo = Math.max(0, lo - padv); hi += padv;
+    var Y = function (v) { return H - pad.b - (v - lo) / (hi - lo) * (H - pad.t - pad.b); };
+    var step = (W - pad.l - pad.r) / pts.length, bw = Math.max(1.5, Math.min(12, step * 0.7));
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+      var v = lo + (hi - lo) * f, y = Y(v);
       svg.appendChild(s('line', { x1: pad.l, x2: W - pad.r, y1: y, y2: y, stroke: '#E3E7EE' }));
       svg.appendChild(s('text', { x: pad.l - 6, y: y + 4, 'text-anchor': 'end', fill: '#6B7688', 'font-size': 11, text: v.toFixed(v < 1 ? 3 : 2) }));
     });
-    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1); }).join(' ');
-    var up = pts[pts.length - 1].y >= pts[0].y;
-    svg.appendChild(s('path', { d: d, fill: 'none', stroke: up ? '#1B7F46' : '#B3261E', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
-    var last = pts[pts.length - 1];
-    svg.appendChild(s('circle', { cx: X(last.x), cy: Y(last.y), r: 4, fill: up ? '#1B7F46' : '#B3261E' }));
-    var fmt = function (t) { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
-    svg.appendChild(s('text', { x: pad.l, y: H - 6, fill: '#6B7688', 'font-size': 11, text: fmt(x0) }));
-    svg.appendChild(s('text', { x: W - pad.r, y: H - 6, 'text-anchor': 'end', fill: '#6B7688', 'font-size': 11, text: fmt(x1) }));
+    pts.forEach(function (k, i) {
+      var x = pad.l + step * (i + 0.5), up = k.c >= k.o, col = up ? '#1B7F46' : '#B3261E';
+      svg.appendChild(s('line', { x1: x, x2: x, y1: Y(k.h), y2: Y(k.l), stroke: col, 'stroke-width': 1 }));
+      svg.appendChild(s('rect', { x: x - bw / 2, y: Math.min(Y(k.o), Y(k.c)), width: bw, height: Math.max(1, Math.abs(Y(k.o) - Y(k.c))), fill: col }));
+    });
+    var last = pts[pts.length - 1], ly = Y(last.c), lcol = last.c >= pts[0].o ? '#1B7F46' : '#B3261E';
+    svg.appendChild(s('line', { x1: pad.l, x2: W - pad.r, y1: ly, y2: ly, stroke: lcol, 'stroke-dasharray': '3 3', opacity: 0.7 }));
+    svg.appendChild(s('rect', { x: W - pad.r - 52, y: ly - 9, width: 52, height: 18, rx: 3, fill: lcol }));
+    svg.appendChild(s('text', { x: W - pad.r - 26, y: ly + 4, 'text-anchor': 'middle', fill: '#fff', 'font-size': 11, 'font-weight': 700, text: last.c.toFixed(last.c < 1 ? 3 : 2) }));
+    var fmt = function (t) { var d = new Date(t); return range <= 24 ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
+    svg.appendChild(s('text', { x: pad.l, y: H - 8, fill: '#6B7688', 'font-size': 11, text: fmt(pts[0].t) }));
+    svg.appendChild(s('text', { x: W - pad.r, y: H - 8, 'text-anchor': 'end', fill: '#6B7688', 'font-size': 11, text: fmt(last.t) }));
     return svg;
   }
 
@@ -254,76 +271,88 @@
     box.appendChild(h('h2', null, c.ticker + ' · ' + c.name + '  ', chgEl(chg(c))));
     box.appendChild(h('p', { 'class': 'muted', text: 'Owner: ' + c.owner_name + (c.description ? '. ' + c.description : '') }));
     var st = h('div', { 'class': 'stats', style: 'margin:8px 0 16px' });
-    [[c.last_price === null ? '-' : px(c.last_price), 'Last price'], [m ? money(m) : '-', 'Market cap'], [c.high24 === null ? '-' : px(c.high24) + ' / ' + px(c.low24), '24h high / low'], [money(c.vol24), '24h volume'],
-     [money(c.balance), 'Company wallet'], [px(c.book_value), 'Cash per share'], [num(c.total_shares), 'Total shares'], [num(c.treasury), 'Unissued shares']].forEach(function (x) {
+    var bidask = q.ok && q.trading ? px(q.bid) + ' / ' + px(q.ask) : '-';
+    [[c.last_price === null ? '-' : px(c.last_price), 'Price'], [bidask, 'Bid / ask'], [c.high24 === null ? '-' : px(c.high24) + ' / ' + px(c.low24), '24h high / low'], [money(c.vol24), '24h volume'],
+     [m ? money(m) : '-', 'Market cap'], [px(c.book_value), 'Cash per share'], [num(c.float_shares) + ' + ' + num(c.mm_shares), 'For sale (company + bank)'], [num(c.total_shares), 'Total shares']].forEach(function (x) {
       st.appendChild(h('div', { 'class': 'stat' }, h('b', { text: x[0] }), h('span', { text: x[1] })));
     });
     box.appendChild(st);
-    box.appendChild(h('h3', { text: 'Price history' }));
-    box.appendChild(chart(detail.trades, c));
 
-    // order book
-    var asks = detail.depth.filter(function (d) { return d.side === 'ask'; }).sort(function (a, b) { return Number(a.price) - Number(b.price); }).slice(0, 6);
-    var bids = detail.depth.filter(function (d) { return d.side === 'bid'; }).sort(function (a, b) { return Number(b.price) - Number(a.price); }).slice(0, 6);
-    var book = h('div', { 'class': 'grid2', style: 'margin:12px 0' });
-    function side(title, list, kind) {
-      var col = h('div', null, h('h3', { text: title }));
-      if (!list.length) col.appendChild(h('p', { 'class': 'muted', text: 'No orders.' }));
-      list.forEach(function (d) {
-        col.appendChild(h('div', { style: 'display:flex;justify-content:space-between;cursor:pointer;padding:2px 0;color:' + (kind === 'ask' ? '#B3261E' : '#1B7F46'),
-          title: 'Click to use this price', onclick: function () { ticket.side = kind === 'ask' ? 'buy' : 'sell'; ticket.price = String(Number(d.price)); renderDetail(); } },
-          h('span', { text: px(d.price) }), h('span', { text: num(d.shares) + ' shares' })));
-      });
-      return col;
-    }
-    book.appendChild(side('Sellers (asks)', asks, 'ask')); book.appendChild(side('Buyers (bids)', bids, 'bid'));
-    box.appendChild(book);
-    if (q.ok && q.bid !== null && q.ask !== null) {
-      box.appendChild(h('p', { 'class': 'muted', text: 'Bank market maker: buys up to ' + num(q.bid_qty) + ' shares at ' + px(q.bid) + ' and sells up to ' + num(q.ask_qty) + ' shares at ' + px(q.ask) + ', based on the company\'s cash per share.' }));
-    } else {
-      box.appendChild(h('p', { 'class': 'muted', text: 'The bank market maker is idle while the company wallet is under about 0.02 diamonds per share.' }));
-    }
+    var head = h('div', { style: 'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px' }, h('h3', { text: 'Price chart', style: 'margin:0' }));
+    var rg = h('div', { style: 'display:flex;gap:6px' });
+    [[24, '1D'], [168, '1W'], [720, '1M'], [8760, 'All']].forEach(function (o) {
+      rg.appendChild(h('button', { 'class': 'btn small' + (range === o[0] ? '' : ' ghost'), type: 'button', text: o[1], onclick: function () { range = o[0]; loadDetail().then(render); } }));
+    });
+    head.appendChild(rg); box.appendChild(head);
+    box.appendChild(chart(detail.series, c));
+    box.appendChild(h('p', { 'class': 'hint', text: 'Prices move every few minutes, with or without trades. Each candle is a slice of time: it opens, rises or falls, and closes.' }));
 
-    // ticket
-    var myH = me && me.holdings.filter(function (x) { return x.corp_id === c.id; })[0];
+    // ticket: buy or sell at the live price
+    var myH = me && me.holdings.filter(function (x) { return x.corp_id === c.id; })[0], owned = myH ? Number(myH.shares) : 0;
     if (wallet) {
       box.appendChild(h('h3', { text: 'Trade', style: 'margin-top:16px' }));
-      var sideSel = h('select', { 'aria-label': 'Buy or sell' }); [['buy', 'Buy'], ['sell', 'Sell my shares']].concat(mine && c.treasury > 0 ? [['ipo', 'Sell new company shares']] : []).forEach(function (o) { sideSel.appendChild(h('option', { value: o[0], text: o[1] })); });
-      sideSel.value = ticket.side;
-      var sh = h('input', { type: 'number', min: 1, step: 1, placeholder: 'Shares', value: ticket.shares, style: 'width:110px', 'aria-label': 'Shares' });
-      var pr = h('input', { type: 'number', min: 0.01, step: 'any', placeholder: 'Limit price each', value: ticket.price, style: 'width:180px', 'aria-label': 'Limit price' });
-      var msg = h('span', { 'class': 'msg', style: 'margin:0' });
-      var info = h('p', { 'class': 'hint' });
-      function upd() {
-        ticket.side = sideSel.value; ticket.shares = sh.value; ticket.price = pr.value;
-        var n = Math.floor(Number(sh.value)), p = Number(pr.value);
-        info.textContent = n > 0 && p > 0 ? (ticket.side === 'buy' ? 'Most this can cost: ' + money(n * p) + '. You pay the seller\'s price if it is lower than your limit.' : 'Selling at least ' + money(n * p) + ' if it fills at your limit or better.') + ' Unfilled shares wait on the book until someone takes them.' : 'Your order fills against the best orders at your limit price or better. Whatever does not fill stays on the book.';
-        if (myH && ticket.side === 'sell') info.textContent += ' You own ' + num(myH.shares) + '.';
-      }
-      [sideSel, sh, pr].forEach(function (e) { e.addEventListener('input', upd); e.addEventListener('change', upd); }); upd();
-      var go = h('button', { 'class': 'btn small', type: 'button', text: 'Place order', onclick: function () {
-        msg.textContent = 'Working...'; msg.className = 'msg';
-        var n = Math.floor(Number(sh.value)), p = Number(pr.value);
-        var call = ticket.side === 'buy' ? rpc('stock_buy', withArgs({ p_corp: c.id, p_shares: n, p_price: p })) : rpc('stock_sell', withArgs({ p_corp: c.id, p_shares: n, p_price: p, p_ipo: ticket.side === 'ipo' }));
-        call.then(function (r) {
-          if (!r.ok) { msg.textContent = r.error || 'That did not work.'; msg.className = 'msg err'; return; }
-          var done = ticket.side === 'buy' ? 'Bought ' + r.filled + ' for ' + money(r.spent) : 'Sold ' + r.sold + ' for ' + money(r.received);
-          status(done + (r.resting > 0 ? '. ' + r.resting + ' more ' + (ticket.side === 'buy' ? 'are waiting as a buy order' : 'are for sale on the book') + '.' : '.'));
-          ticket = { side: ticket.side, price: '', shares: '' }; reload();
+      if (!(q.ok && q.trading)) {
+        box.appendChild(h('p', { 'class': 'muted', text: c.ticker + ' is not trading yet. ' + (mine ? 'Issue shares below to take it public.' : 'The owner has to take it public first.') }));
+      } else {
+        var tabs = h('div', { style: 'display:flex;gap:6px;margin-bottom:8px' });
+        [['buy', 'Buy'], ['sell', 'Sell']].forEach(function (o) {
+          tabs.appendChild(h('button', { 'class': 'btn small' + (ticket.side === o[0] ? '' : ' ghost'), type: 'button', text: o[1], onclick: function () { ticket.side = o[0]; renderDetail(); } }));
         });
-      } });
-      box.appendChild(h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, sideSel, sh, pr, go, msg)); box.appendChild(info);
-
-      // my orders here
-      var myL = me.listings.filter(function (l) { return l.corp_id === c.id; }), myB = me.bids.filter(function (b) { return b.corp_id === c.id; });
-      if (myL.length || myB.length) {
-        box.appendChild(h('p', { 'class': 'muted', style: 'margin:10px 0 4px', text: 'Your open orders here' }));
-        myB.forEach(function (b) { box.appendChild(h('div', { style: 'margin:4px 0' }, 'Buy ' + num(b.shares) + ' at ' + px(b.price) + '  ', h('button', { 'class': 'btn small ghost', type: 'button', text: 'Cancel', onclick: function () { rpc('stock_cancel_bid', withArgs({ p_bid: b.id })).then(function (r) { if (r.ok) { status('Order cancelled. Your diamonds are back.'); reload(); } else status(r.error, true); }); } }))); });
-        myL.forEach(function (l) { box.appendChild(h('div', { style: 'margin:4px 0' }, 'Sell ' + num(l.shares) + ' at ' + px(l.price) + (l.is_ipo ? ' (new company shares)' : '') + '  ', h('button', { 'class': 'btn small ghost', type: 'button', text: 'Cancel', onclick: function () { rpc('corp_cancel', withArgs({ p_listing: l.id })).then(function (r) { if (r.ok) { status('Order cancelled. Your shares are back.'); reload(); } else status(r.error, true); }); } }))); });
+        box.appendChild(tabs);
+        var sh = h('input', { type: 'number', min: 1, step: 1, placeholder: 'Shares', value: ticket.shares, style: 'width:120px', 'aria-label': 'Shares' });
+        var maxBtn = h('button', { 'class': 'btn small ghost', type: 'button', text: 'Max', onclick: function () {
+          var n = ticket.side === 'sell' ? Math.min(owned, q.sell_room) : Math.min(Math.floor(wallet.balance / Number(q.ask) * 0.9), q.buy_avail, q.max_order);
+          sh.value = Math.max(0, n) || ''; upd();
+        } });
+        var msg = h('span', { 'class': 'msg', style: 'margin:0' });
+        var info = h('div', { 'class': 'hint', style: 'min-height:20px' });
+        var go = h('button', { 'class': 'btn small', type: 'button', text: ticket.side === 'buy' ? 'Buy' : 'Sell' });
+        var prev = null, timer = null, seq = 0;
+        function upd() {
+          ticket.shares = sh.value; prev = null; go.disabled = true; msg.textContent = '';
+          var n = Math.floor(Number(sh.value));
+          clearTimeout(timer);
+          if (!(n > 0)) { info.textContent = ticket.side === 'buy' ? 'Buys at the live price. Bigger orders push the price up as they fill, and the price stays moved.' : 'You own ' + num(owned) + '. Selling pushes the price down as it fills.'; return; }
+          if (ticket.side === 'sell' && n > owned) { info.textContent = 'You only own ' + num(owned) + '.'; return; }
+          info.textContent = 'Checking the price...';
+          var my = ++seq;
+          timer = setTimeout(function () {
+            rpc('stock_preview', { p_corp: c.id, p_side: ticket.side, p_shares: n }).then(function (r) {
+              if (my !== seq) return;
+              if (!r.ok) { info.textContent = r.error || 'Cannot price that.'; return; }
+              prev = r; clear(info);
+              info.appendChild(document.createTextNode((ticket.side === 'buy' ? 'About ' + money(r.total) + ' for ' + num(n) + ' shares (' + px(r.avg) + ' each). ' : 'About ' + money(r.total) + ' for ' + num(n) + ' shares (' + px(r.avg) + ' each). ') +
+                'Price after: ' + px(r.price_after) + ' (' + (r.impact_pct >= 0 ? '+' : '') + r.impact_pct + '%).'));
+              if (ticket.side === 'buy' && r.total > wallet.balance) info.appendChild(h('div', { 'class': 'msg err', text: 'You only have ' + money(wallet.balance) + '.' }));
+              else go.disabled = false;
+            });
+          }, 250);
+        }
+        sh.addEventListener('input', upd);
+        go.onclick = function () {
+          var n = Math.floor(Number(sh.value)); if (!(n > 0)) return;
+          msg.textContent = 'Working...'; msg.className = 'msg'; go.disabled = true;
+          rpc('stock_preview', { p_corp: c.id, p_side: ticket.side, p_shares: n }).then(function (pv) {
+            if (!pv.ok) { msg.textContent = pv.error || 'That did not work.'; msg.className = 'msg err'; return; }
+            var call = ticket.side === 'buy'
+              ? rpc('stock_buy', withArgs({ p_corp: c.id, p_shares: n, p_price: Math.round(pv.avg * 1.03 * 10000) / 10000 }))
+              : rpc('stock_sell', withArgs({ p_corp: c.id, p_shares: n, p_price: Math.max(0.01, Math.round(pv.avg * 0.97 * 10000) / 10000), p_ipo: false }));
+            return call.then(function (r) {
+              if (!r.ok) { msg.textContent = r.error || 'That did not work.'; msg.className = 'msg err'; go.disabled = false; return; }
+              status((ticket.side === 'buy' ? 'Bought ' + r.filled + ' ' + c.ticker + ' for ' + money(r.spent) : 'Sold ' + r.sold + ' ' + c.ticker + ' for ' + money(r.received)) +
+                ' (' + px(r.avg) + ' each).' + (r.bonus > 0 ? ' Daily trading bonus: +' + money(r.bonus) + '.' : ''));
+              ticket.shares = ''; reload();
+            });
+          });
+        };
+        box.appendChild(h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, sh, maxBtn, go, msg)); box.appendChild(info);
+        upd();
       }
       box.appendChild(mini('Send diamonds to the company', [{ ph: 'Amount', type: 'number', w: 120, min: 0.01 }], 'Send', function (v, done) {
         rpc('corp_deposit', withArgs({ p_corp: c.id, p_amount: Number(v[0]) })).then(function (r) { done(r, 'Sent ' + v[0] + ' diamonds to ' + c.ticker + '.'); });
       }, 'Funding a company puts diamonds in its wallet. You do not get shares for it.'));
+    } else {
+      box.appendChild(h('p', { 'class': 'muted', style: 'margin-top:14px', text: 'Log in (Your wallet, below) to trade.' }));
     }
 
     // holders
@@ -332,7 +361,8 @@
       var p = x.shares / c.total_shares;
       box.appendChild(h('div', { 'class': 'row' }, h('div', { 'class': 'row-head' }, h('b', { text: x.holder }), h('span', { text: num(x.shares) + ' · ' + (p * 100).toFixed(1) + '%' })), h('div', { 'class': 'bar' }, h('i', { style: 'width:' + (p * 100).toFixed(1) + '%;background:#14788C' }))));
     });
-    if (c.treasury > 0) box.appendChild(h('p', { 'class': 'muted', text: 'The company itself holds ' + num(c.treasury) + ' unissued shares.' }));
+    if (c.float_shares > 0) box.appendChild(h('p', { 'class': 'muted', text: 'The company is selling ' + num(c.float_shares) + ' shares to the public.' }));
+    if (c.treasury > 0) box.appendChild(h('p', { 'class': 'muted', text: 'The company keeps ' + num(c.treasury) + ' shares in reserve (not for sale).' }));
 
     // reports
     box.appendChild(h('h3', { text: 'Reports and news', style: 'margin-top:18px' }));
@@ -344,7 +374,15 @@
     // owner
     if (mine) {
       box.appendChild(h('h3', { text: 'Owner controls', style: 'margin-top:18px' }));
-      box.appendChild(h('p', { 'class': 'muted', text: 'The company wallet holds ' + money(c.balance) + '. Only you can spend it. To sell new shares, pick "Sell new company shares" in the Trade box above.' }));
+      box.appendChild(h('p', { 'class': 'muted', text: 'The company wallet holds ' + money(c.balance) + '. Only you can spend it. Sales of company shares to players go straight into that wallet.' }));
+      var trading = q.ok && q.trading;
+      var iss = [{ ph: 'Shares to sell', type: 'number', w: 130, min: 1, step: 1 }].concat(trading ? [] : [{ ph: 'Opening price', type: 'number', w: 130, min: 0.01 }]);
+      box.appendChild(mini(trading ? 'Issue more shares for sale (' + num(c.treasury) + ' in reserve)' : 'Take ' + c.ticker + ' public (' + num(c.treasury) + ' in reserve)', iss, trading ? 'Issue shares' : 'Go public', function (v, done) {
+        rpc('corp_issue', withArgs({ p_corp: c.id, p_shares: Math.floor(Number(v[0])), p_price: trading ? null : Number(v[1]) })).then(function (r) { done(r, trading ? 'Shares are on sale.' : c.ticker + ' is public.'); });
+      }, trading ? 'Adding shares dilutes the price a little. Players buy them at the live price and the diamonds go to your company wallet.' : 'The opening price is where trading starts. After that the market moves it.'));
+      if (c.float_shares > 0) box.appendChild(mini('Pull unsold shares back (' + num(c.float_shares) + ' on sale)', [{ ph: 'Shares', type: 'number', w: 120, min: 1, step: 1 }], 'Pull back', function (v, done) {
+        rpc('corp_recall', withArgs({ p_corp: c.id, p_shares: Math.floor(Number(v[0])) })).then(function (r) { done(r, 'Shares pulled back.'); });
+      }));
       var pk = h('select', { 'aria-label': 'Report or news' }); [['report', 'Report'], ['news', 'News']].forEach(function (o) { pk.appendChild(h('option', { value: o[0], text: o[1] })); });
       var pt = h('input', { type: 'text', placeholder: 'Headline', maxlength: 80, style: 'width:220px', 'aria-label': 'Headline' });
       var pb = h('input', { type: 'text', placeholder: 'Details (optional)', maxlength: 600, style: 'width:300px', 'aria-label': 'Details' });
@@ -369,7 +407,8 @@
     box.appendChild(h('h3', { text: 'Recent trades', style: 'margin-top:18px' }));
     if (!detail.trades.length) box.appendChild(h('p', { 'class': 'muted', text: 'No trades yet.' }));
     detail.trades.slice(0, 10).forEach(function (t) {
-      box.appendChild(h('div', { 'class': 'muted', text: new Date(t.created_at).toLocaleString() + ': ' + t.buyer_name + ' bought ' + num(t.shares) + ' at ' + px(t.price) + ' from ' + (t.seller_name || 'the company') }));
+      var mmBuy = t.buyer_name === 'the market maker';
+      box.appendChild(h('div', { 'class': 'muted', text: new Date(t.created_at).toLocaleString() + ': ' + (mmBuy ? t.seller_name + ' sold ' : t.buyer_name + ' bought ') + num(t.shares) + ' at ' + px(t.price) }));
     });
     box.appendChild(h('h3', { text: 'Company wallet activity', style: 'margin-top:18px' }));
     if (!detail.log.length) box.appendChild(h('p', { 'class': 'muted', text: 'Nothing yet.' }));
@@ -388,7 +427,7 @@
       if (x[2] === 'number') { i.min = 0; i.step = 1; }
       f[x[0]] = i; box.appendChild(h('div', { 'class': 'field' }, h('label', { text: x[1] }), i));
     });
-    box.appendChild(h('p', { 'class': 'hint', text: 'The shares you do not keep go to the company. You can sell them later for the company to earn diamonds.' }));
+    box.appendChild(h('p', { 'class': 'hint', text: 'The shares you do not keep stay in reserve. When you are ready, take the company public from its page and set an opening price. Players then buy them and the diamonds go to the company wallet.' }));
     var msg = h('div', { 'class': 'msg' });
     box.appendChild(h('button', { 'class': 'btn', type: 'button', text: 'Start corporation', onclick: function () {
       if (!session) { msg.textContent = 'Log in first.'; msg.className = 'msg err'; return; }
