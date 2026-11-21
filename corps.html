@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Corporations | World Election</title>
+<title>Stock Market | World Election</title>
 <meta name="description" content="Start corporations, trade shares and pay other players with diamonds.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,13 +26,14 @@
 <main id="main" class="wrap">
   <section class="hero">
     <div>
-      <p class="eyebrow">Companies and stocks</p>
+      <p class="eyebrow">Stock market</p>
       <h1>Corporations</h1>
-      <p class="headline">Start a company, sell shares, pay dividends, trade stocks and pay other players.</p>
+      <p class="headline">Start a company, trade its shares on a live order book and pay other players.</p>
     </div>
     <div class="stats">
+      <div class="stat"><b id="st-idx">-</b><span>TC Index (total market cap)</span></div>
+      <div class="stat"><b id="st-chg">-</b><span>Index 24h</span></div>
       <div class="stat"><b id="st-n">0</b><span>Corporations</span></div>
-      <div class="stat"><b id="st-cap">-</b><span>Total market cap</span></div>
       <div class="stat"><b id="st-bal">-</b><span>Your diamonds</span></div>
     </div>
   </section>
@@ -40,8 +41,8 @@
   <div id="status" class="msg" role="status" style="margin-bottom: 12px"></div>
 
   <section class="grid2">
-    <div class="card"><h2>Your wallet</h2><div id="wallet"></div></div>
-    <div class="card"><h2>Pay a player</h2><div id="pay"></div></div>
+    <div class="card"><h2>Biggest movers (24h)</h2><div id="movers"></div></div>
+    <div class="card"><h2>Market news</h2><div id="feed"></div></div>
   </section>
 
   <section class="card" style="margin-bottom: 24px">
@@ -50,6 +51,13 @@
   </section>
 
   <section id="detail" class="card" style="margin-bottom: 24px" hidden></section>
+
+  <section class="grid2">
+    <div class="card"><h2>Your wallet</h2><div id="wallet"></div></div>
+    <div class="card"><h2>Pay a player</h2><div id="pay"></div></div>
+  </section>
+
+  <section class="card" style="margin-bottom: 24px"><h2>Your portfolio</h2><div id="portfolio"></div></section>
 
   <section class="card" style="margin-bottom: 24px">
     <h2>Start a corporation</h2>

@@ -263,7 +263,7 @@
       } }))));
 
     // corporation fees
-    [['corp_fee', 'Corporation registration fee', 'Diamonds it costs to start a corporation (goes back to the bank).', 50, 1], ['transfer_fee_pct', 'Player payment fee (%)', 'Percent added on top of every player-to-player payment (goes back to the bank). 0 means free.', 0, 0.5]].forEach(function (cfg) {
+    [['mm_capital', 'Market maker cash per company', 'Diamonds the bank lends the market maker for each company it trades.', 100, 10], ['mm_spread_pct', 'Market maker spread (%)', 'Gap between its buy and sell price, as a percent of cash per share.', 10, 1], ['mm_max_pct', 'Market maker max holding (%)', 'Most of a company\'s shares the market maker will own.', 5, 1], ['corp_fee', 'Corporation registration fee', 'Diamonds it costs to start a corporation (goes back to the bank).', 50, 1], ['transfer_fee_pct', 'Player payment fee (%)', 'Percent added on top of every player-to-player payment (goes back to the bank). 0 means free.', 0, 0.5]].forEach(function (cfg) {
       var row = (settings || []).filter(function (r) { return r.key === cfg[0]; })[0];
       if (!row) return;
       var inp = h('input', { type: 'number', min: 0, step: cfg[4], value: row.value, 'aria-label': cfg[1], style: 'width:110px' });
@@ -339,7 +339,7 @@
       var d = r.data, f = function (n) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
       var cap = h('input', { type: 'number', min: 0, step: 100, value: Number(d.cap), 'aria-label': 'Total diamond cap' });
       bankBox.appendChild(h('div', { 'class': 'who' }, h('b', { text: 'Bank' }), h('span', { text: f(d.bank) + 'dia left of ' + f(d.cap) + ' total' })));
-      bankBox.appendChild(h('p', { 'class': 'muted', style: 'margin:6px 0', text: f(d.wallets) + ' in wallets, ' + f(d.corps || 0) + ' in corporations, ' + f(d.markets) + ' locked in live markets. Prizes and starter diamonds come out of the bank.' }));
+      bankBox.appendChild(h('p', { 'class': 'muted', style: 'margin:6px 0', text: f(d.wallets) + ' in wallets, ' + f(d.corps || 0) + ' in corporations and market makers, ' + f(d.orders || 0) + ' in open buy orders, ' + f(d.markets) + ' locked in live markets. Prizes and starter diamonds come out of the bank.' }));
       bankBox.appendChild(h('div', { 'class': 'acts', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, h('label', { text: 'Total cap' }), cap,
         h('button', { 'class': 'btn small', type: 'button', text: 'Set cap', onclick: function () { actRpc(sb.rpc('admin_set_cap', { p_cap: Number(cap.value) }), 'Cap updated.'); } })));
     });
